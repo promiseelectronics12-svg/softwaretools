@@ -119,11 +119,6 @@ export default function Header() {
             {lang === "en" ? "বাং" : "EN"}
           </button>
 
-          {/* Orders link — desktop only */}
-          <Link href="/orders" className="orders-link" style={{ height: 36, padding: "0 0.75rem", borderRadius: "0.625rem", fontSize: "0.8125rem", fontWeight: 600, color: "#475569", textDecoration: "none", display: "none", alignItems: "center", whiteSpace: "nowrap" }}>
-            Order Status
-          </Link>
-
           {/* My Subscription link */}
           <Link href="/lookup" className="orders-link" style={{ height: 36, padding: "0 0.75rem", borderRadius: "0.625rem", fontSize: "0.8125rem", fontWeight: 700, color: "#059669", textDecoration: "none", display: "none", alignItems: "center", whiteSpace: "nowrap", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
             🔑 My Subscription
@@ -158,7 +153,7 @@ export default function Header() {
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 clamp(1rem,4vw,1.5rem)", height: 40, display: "flex", alignItems: "center", gap: "0.25rem" }}>
           {[
             { href: "/shop", label: t.shop },
-            { href: "/orders", label: t.order },
+            { href: "/lookup", label: "My Subscription" },
             { href: "/contact", label: t.contact },
           ].map((link) => (
             <Link key={link.href} href={link.href} style={{ padding: "0 0.75rem", height: 30, borderRadius: "0.5rem", fontSize: "0.8125rem", fontWeight: 600, color: "#64748b", textDecoration: "none", display: "flex", alignItems: "center", transition: "all 0.2s ease", whiteSpace: "nowrap" }} className="subnav-link">
@@ -189,7 +184,7 @@ export default function Header() {
             </form>
             {[
               { href: "/shop", label: t.shop },
-              { href: "/orders", label: "Order Status" },
+              { href: "/lookup", label: "My Subscription" },
               { href: "/contact", label: t.contact },
             ].map((link) => (
               <Link key={link.href} href={link.href} onClick={() => setMobileMenu(false)} style={{ display: "block", padding: "0.75rem 0.875rem", borderRadius: "0.75rem", fontSize: "0.9375rem", fontWeight: 600, color: "#475569", textDecoration: "none", background: "#f8faf9" }}>

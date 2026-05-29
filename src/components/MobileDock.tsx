@@ -38,12 +38,12 @@ const navItems = [
     ),
   },
   {
-    href: "/orders",
-    labelEn: "Orders",
-    labelBn: "অর্ডার",
+    href: "/lookup",
+    labelEn: "My Sub",
+    labelBn: "সাবস্ক্রি",
     icon: (
       <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
       </svg>
     ),
   },
@@ -151,7 +151,7 @@ export default function MobileDock() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
               {[
                 { href: "/shop", icon: "🛍️", labelEn: "Shop", labelBn: "শপ" },
-                { href: "/orders", icon: "📦", labelEn: "Order Status", labelBn: "অর্ডার ট্র্যাক" },
+                { href: "/lookup", icon: "🔑", labelEn: "My Subscription", labelBn: "সাবস্ক্রিপশন" },
                 { href: "/contact", icon: "📞", labelEn: "Contact", labelBn: "যোগাযোগ" },
                 { href: "/cart", icon: "🛒", labelEn: "Cart", labelBn: "কার্ট" },
               ].map((link) => (
