@@ -22,7 +22,7 @@ export default function HowItWorks() {
     },
     {
       q: "Are the subscription warranties 100% covered?",
-      a: "Yes. All digital tools purchased on DiziStore come with a full active replacement warranty. If you encounter any access blocks or technical issues during your package duration, we will instantly replace the credentials.",
+      a: "Yes. All digital tools purchased on Official Toon Store come with a full active replacement warranty. If you encounter any access blocks or technical issues during your package duration, we will instantly replace the credentials.",
     },
   ];
 

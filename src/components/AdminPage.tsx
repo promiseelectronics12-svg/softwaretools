@@ -201,7 +201,7 @@ function AdminLoginForm({ onLogin }: { onLogin: (user: SessionUser) => void }) {
           <div style={{ width: 60, height: 60, borderRadius: "1.375rem", background: "linear-gradient(135deg,#00c853,#059669)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.125rem", boxShadow: "0 8px 32px rgba(16,185,129,0.3)" }}>
             <svg width="28" height="28" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
-          <h1 style={{ fontSize: "1.375rem", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", margin: 0 }}>DiziStore Admin</h1>
+          <h1 style={{ fontSize: "1.375rem", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", margin: 0 }}>Official Toon Store Admin</h1>
           <p style={{ fontSize: "0.8125rem", color: "#475569", fontWeight: 500, marginTop: "0.375rem" }}>Sign in to the control panel</p>
         </div>
 
@@ -903,7 +903,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
               <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
             </div>
             <div>
-              <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#064e3b", lineHeight: 1 }}>DiziStore</p>
+              <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#064e3b", lineHeight: 1 }}>Official Toon Store</p>
               <p style={{ fontSize: "0.6875rem", color: "#2e7d32", fontWeight: 700, marginTop: "0.2rem" }}>Admin Panel</p>
             </div>
           </div>
@@ -941,7 +941,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
       <div className="admin-main" style={{ marginLeft: 220, flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
 
         {/* Top bar */}
-        <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(16, 185, 129, 0.12)", padding: "0 1.5rem", height: 58, display: "flex", alignItems: "center", gap: "0.875rem", boxShadow: "0 1px 4px rgba(16, 185, 129, 0.03)" }}>
+        <header className="admin-topbar" style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(16, 185, 129, 0.12)", padding: "0 clamp(0.75rem,3vw,1.5rem)", height: 52, display: "flex", alignItems: "center", gap: "0.75rem", boxShadow: "0 1px 4px rgba(16, 185, 129, 0.03)" }}>
           <h1 style={{ fontSize: "1rem", fontWeight: 800, color: "#064e3b", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
             {tabs.find((t) => t.key === tab)?.icon} {tabs.find((t) => t.key === tab)?.label}
           </h1>
@@ -1059,7 +1059,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                         return (
                           <div key={o.id} style={{ background: o.status === "pending" ? "linear-gradient(to right,#fffbeb 0%,#fff 60%)" : "#fff", border: `1px solid ${isSelected ? "#10b981" : "#e8edf3"}`, borderLeft: `4px solid ${STATUS_COLORS[o.status]?.dot || "#e2e8f0"}`, borderRadius: "1.125rem", overflow: "hidden", boxShadow: isExpanded ? "0 4px 16px rgba(0,0,0,0.07)" : "0 1px 3px rgba(0,0,0,0.04)", transition: "all 0.2s ease" }}>
                             {/* Compact row */}
-                            <div style={{ padding: "0.875rem 1.25rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "nowrap", cursor: "pointer" }} onClick={() => toggleExpandOrder(o.id)}>
+                            <div className="order-row" style={{ padding: "0.875rem 1.25rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "nowrap", cursor: "pointer" }} onClick={() => toggleExpandOrder(o.id)}>
                               <input type="checkbox" checked={isSelected} onChange={() => toggleSelectOrder(o.id)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16, flexShrink: 0 }} />
 
                               {/* Status dot */}
@@ -1074,7 +1074,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                               </span>
 
                               {/* Phone */}
-                              <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, flexShrink: 0, minWidth: 110, display: "flex", alignItems: "center", gap: "0.25rem" }}>📱 {o.phone || "—"}</span>
+                              <span className="order-col-phone" style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, flexShrink: 0, minWidth: 110, display: "flex", alignItems: "center", gap: "0.25rem" }}>📱 {o.phone || "—"}</span>
 
                               {/* Amount */}
                               <span style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#0f172a", flexShrink: 0 }}>৳{o.totalBdt}</span>
@@ -1090,7 +1090,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                               )}
 
                               {/* Time */}
-                              <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 600, flexShrink: 0 }}>{timeAgo(o.createdAt)}</span>
+                              <span className="order-col-time" style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 600, flexShrink: 0 }}>{timeAgo(o.createdAt)}</span>
 
                               {/* Quick actions — stop propagation */}
                               <div style={{ display: "flex", gap: "0.375rem", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
@@ -1767,15 +1767,53 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
         @keyframes drawerIn { from { transform:translateX(100%); } to { transform:translateX(0); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* ── Tablet (900px) ── */
         @media (max-width: 900px) {
           .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
         }
+
+        /* ── Mobile (768px) ── */
         @media (max-width: 768px) {
+          /* Layout */
           .admin-sidebar { display: none !important; }
-          .admin-main { margin-left: 0 !important; padding-bottom: 80px !important; }
-          .admin-mobile-nav { display: flex !important; }
+          .admin-main { margin-left: 0 !important; padding-bottom: 72px !important; }
+          .admin-mobile-nav { display: flex !important; overflow-x: auto; }
           .admin-chips { display: none !important; }
+
+          /* Stats */
+          .stats-grid {
+            grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+            padding: 0.75rem 1rem !important;
+            gap: 0.5rem !important;
+          }
+
+          /* Content padding */
+          main { padding: 0.875rem !important; }
+
+          /* Order rows — wrap on mobile */
+          .order-row {
+            flex-wrap: wrap !important;
+            padding: 0.75rem !important;
+            gap: 0.375rem !important;
+          }
+          /* Hide secondary cols, visible in expanded section */
+          .order-col-phone { display: none !important; }
+          .order-col-time  { display: none !important; }
+
+          /* Inputs full-width in toolbars */
+          .admin-main input[type="text"],
+          .admin-main input[type="search"] {
+            min-width: unset !important;
+            width: 100% !important;
+          }
+        }
+
+        /* ── Small mobile (480px) ── */
+        @media (max-width: 480px) {
           .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+          .admin-mobile-nav button { min-width: 40px !important; padding: 0.2rem 0.375rem !important; }
+          .admin-mobile-nav span[style] { font-size: 0.5rem !important; }
         }
       `}</style>
     </div>

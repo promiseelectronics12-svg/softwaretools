@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useLang } from "@/lib/language-context";
+import { useSettings } from "@/lib/use-settings";
 
 export default function ContactPage() {
   const { t } = useLang();
+  const s = useSettings();
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [sent, setSent] = useState(false);
 
@@ -72,10 +74,10 @@ export default function ContactPage() {
             <h3 style={{ fontWeight: 700, fontSize: "1.0625rem", color: "#0f172a", marginBottom: "0.375rem" }}>
               {t.whatsappChat}
             </h3>
-            <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#94a3b8" }}>+880 1879-009680</p>
+            <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#94a3b8" }}>{s.whatsapp_number || "8801879009680"}</p>
           </div>
           <a
-            href="https://wa.me/8801879009680"
+            href={s.whatsapp_link || "https://wa.me/8801879009680"}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-primary"
@@ -115,10 +117,10 @@ export default function ContactPage() {
             <h3 style={{ fontWeight: 700, fontSize: "1.0625rem", color: "#0f172a", marginBottom: "0.375rem" }}>
               {t.sendEmail}
             </h3>
-            <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#94a3b8" }}>support@officialtoolstore.com</p>
+            <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#94a3b8" }}>{s.support_email || "support@officialtoonstore.com"}</p>
           </div>
           <a
-            href="mailto:support@officialtoolstore.com"
+            href={`mailto:${s.support_email || "support@officialtoonstore.com"}`}
             className="btn btn-ghost"
             style={{ textAlign: "center", fontSize: "0.875rem" }}
           >

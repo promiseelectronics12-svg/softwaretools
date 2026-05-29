@@ -99,7 +99,7 @@ export default function InstallPrompt() {
               margin: 0,
             }}
           >
-            Install DiziStore
+            Install Official Toon Store
           </p>
           <p
             style={{

@@ -42,7 +42,7 @@ self.addEventListener("fetch", (event) => {
 
 // Push: receive notification from server
 self.addEventListener("push", (event) => {
-  let data = { title: "DiziStore", body: "You have a new update!", url: "/lookup" };
+  let data = { title: "Official Toon Store", body: "You have a new update!", url: "/lookup" };
 
   try {
     if (event.data) {
