@@ -152,3 +152,24 @@ export const supportMessages = pgTable("support_messages", {
   createdAt:  timestamp("created_at").defaultNow().notNull(),
 });
 
+// Push notification subscriptions — linked to phone (customer identity)
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id:        serial("id").primaryKey(),
+  phone:     varchar("phone", { length: 50 }).notNull(),
+  deviceId:  varchar("device_id", { length: 64 }).notNull(),
+  endpoint:  text("endpoint").notNull(),            // Web Push service URL
+  p256dh:    text("p256dh").notNull(),               // Client public encryption key
+  auth:      text("auth").notNull(),                 // Auth secret
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Site-wide settings editable from admin panel.
+// Super User can edit all. Super User can grant moderators edit access per key
+// by setting a companion key: "perm_<key>" = "true".
+export const siteSettings = pgTable("site_settings", {
+  key:       varchar("key", { length: 100 }).primaryKey(),
+  value:     text("value").notNull().default(""),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import PageShell from "@/components/PageShell";
+import PushManager from "@/components/PushManager";
 
 /* ─── Types ─── */
 interface Credential {
@@ -687,6 +688,11 @@ export default function LookupPage() {
           <div style={{ marginTop: "2rem" }}>
             <SupportForm token={token} phone={phone} />
           </div>
+        )}
+
+        {/* Push notification opt-in — only shown to authenticated customers */}
+        {token && phone && (
+          <PushManager phone={phone} deviceId={deviceIdRef.current} token={token} />
         )}
       </div>
 

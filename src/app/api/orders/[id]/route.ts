@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getAdminSession } from "@/lib/admin-auth";
+import { sendPushToPhone } from "@/lib/push";
 
 export async function PATCH(
   req: NextRequest,
@@ -49,6 +50,22 @@ export async function PATCH(
 
   if (!updated) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+
+  // Send push notification when order is completed (delivered)
+  if (body.status === "completed" && updated.phone) {
+    try {
+      const items = updated.items as { nameEn?: string }[] | null;
+      const productName = items?.[0]?.nameEn || "your product";
+      await sendPushToPhone(updated.phone, {
+        title: "✅ Your Order is Ready!",
+        body: `Your ${productName} credential has been delivered. Tap to view.`,
+        url: "/lookup",
+      });
+    } catch (err) {
+      // Push failure should never block order completion
+      console.error("[Push] Failed to notify customer:", err);
+    }
   }
 
   return NextResponse.json({ order: updated });

@@ -5,6 +5,8 @@ import { LanguageProvider } from "@/lib/language-context";
 import { CartProvider } from "@/lib/cart-context";
 import { AuthProvider } from "@/lib/auth-context";
 import MobileDock from "@/components/MobileDock";
+import InstallPrompt from "@/components/InstallPrompt";
+import { registerServiceWorker } from "@/lib/register-sw";
 
 /**
  * ClientProviders — wraps the entire app with context providers.
@@ -16,6 +18,9 @@ export function ClientProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Small delay to prevent FOUC (flash of unstyled content)
     setReady(true);
+
+    // Register service worker for PWA + push notifications
+    registerServiceWorker();
   }, []);
 
   return (
@@ -54,6 +59,7 @@ export function ClientProviders({ children }: { children: ReactNode }) {
             <>
               {children}
               <MobileDock />
+              <InstallPrompt />
             </>
           )}
         </CartProvider>
