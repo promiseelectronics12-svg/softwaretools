@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { ClientProviders } from "./client-providers";
@@ -9,6 +9,13 @@ const outfit = Outfit({
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f5f7f5",
+};
 
 export const metadata: Metadata = {
   title: "OfficialToolStore — Premium Digital Tools",
@@ -21,6 +28,12 @@ export const metadata: Metadata = {
       "Instant access to premium accounts & subscriptions. Lightning-fast delivery.",
     type: "website",
   },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "OfficialToolStore",
+  },
 };
 
 export default function RootLayout({
@@ -31,16 +44,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={outfit.variable}>
       <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
-        />
-        <meta name="theme-color" content="#f5f7f5" />
-        {/* PWA */}
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="DiziStore" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body>
