@@ -201,7 +201,7 @@ function AdminLoginForm({ onLogin }: { onLogin: (user: SessionUser) => void }) {
           <div style={{ width: 60, height: 60, borderRadius: "1.375rem", background: "linear-gradient(135deg,#00c853,#059669)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.125rem", boxShadow: "0 8px 32px rgba(16,185,129,0.3)" }}>
             <svg width="28" height="28" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
-          <h1 style={{ fontSize: "1.375rem", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", margin: 0 }}>Official Toon Store Admin</h1>
+          <h1 style={{ fontSize: "1.375rem", fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em", margin: 0 }}>Official Tool Store Admin</h1>
           <p style={{ fontSize: "0.8125rem", color: "#475569", fontWeight: 500, marginTop: "0.375rem" }}>Sign in to the control panel</p>
         </div>
 
@@ -903,7 +903,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
               <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
             </div>
             <div>
-              <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#064e3b", lineHeight: 1 }}>Official Toon Store</p>
+              <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#064e3b", lineHeight: 1 }}>Official Tool Store</p>
               <p style={{ fontSize: "0.6875rem", color: "#2e7d32", fontWeight: 700, marginTop: "0.2rem" }}>Admin Panel</p>
             </div>
           </div>

@@ -99,7 +99,7 @@ export default function InstallPrompt() {
               margin: 0,
             }}
           >
-            Install Official Toon Store
+            Install Official Tool Store
           </p>
           <p
             style={{

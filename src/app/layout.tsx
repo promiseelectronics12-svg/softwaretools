@@ -18,12 +18,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Official Toon Store — Premium Digital Tools",
+  title: "Official Tool Store — Premium Digital Tools",
   description:
     "Instant access to premium accounts & subscriptions. Lightning-fast delivery.",
   keywords: ["premium tools", "digital subscriptions", "streaming", "AI tools"],
   openGraph: {
-    title: "Official Toon Store — Premium Digital Tools",
+    title: "Official Tool Store — Premium Digital Tools",
     description:
       "Instant access to premium accounts & subscriptions. Lightning-fast delivery.",
     type: "website",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Toon Store",
+    title: "Tool Store",
   },
 };
 

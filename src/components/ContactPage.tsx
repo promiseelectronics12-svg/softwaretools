@@ -117,10 +117,10 @@ export default function ContactPage() {
             <h3 style={{ fontWeight: 700, fontSize: "1.0625rem", color: "#0f172a", marginBottom: "0.375rem" }}>
               {t.sendEmail}
             </h3>
-            <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#94a3b8" }}>{s.support_email || "support@officialtoonstore.com"}</p>
+            <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#94a3b8" }}>{s.support_email || "support@OfficialToolStore.com"}</p>
           </div>
           <a
-            href={`mailto:${s.support_email || "support@officialtoonstore.com"}`}
+            href={`mailto:${s.support_email || "support@OfficialToolStore.com"}`}
             className="btn btn-ghost"
             style={{ textAlign: "center", fontSize: "0.875rem" }}
           >

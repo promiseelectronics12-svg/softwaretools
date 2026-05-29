@@ -166,7 +166,7 @@ export default function Footer() {
           }}
         >
           <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            © {new Date().getFullYear()} {s.store_name || "Official Toon Store"}. {t.allRightsReserved}
+            © {new Date().getFullYear()} {s.store_name || "Official Tool Store"}. {t.allRightsReserved}
           </p>
           <div style={{ display: "flex", gap: "1rem" }}>
             <Link href="/terms" style={{ fontSize: "0.75rem", fontWeight: 600, color: "#94a3b8", textDecoration: "none" }}>Terms</Link>
