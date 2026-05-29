@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import PageShell from "@/components/PageShell";
 import Hero from "@/components/Hero";
 import ProductGrid from "@/components/ProductGrid";
@@ -8,7 +9,9 @@ export default function HomePage() {
   return (
     <PageShell>
       <Hero />
-      <ProductGrid />
+      <Suspense>
+        <ProductGrid />
+      </Suspense>
       <HowItWorks />
       <ReviewsSection />
     </PageShell>
