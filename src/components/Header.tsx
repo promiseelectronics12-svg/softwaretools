@@ -121,7 +121,7 @@ export default function Header() {
 
           {/* Orders link — desktop only */}
           <Link href="/orders" className="orders-link" style={{ height: 36, padding: "0 0.75rem", borderRadius: "0.625rem", fontSize: "0.8125rem", fontWeight: 600, color: "#475569", textDecoration: "none", display: "none", alignItems: "center", whiteSpace: "nowrap" }}>
-            {t.trackOrder}
+            Order Status
           </Link>
 
           {/* My Subscription link */}
@@ -189,7 +189,7 @@ export default function Header() {
             </form>
             {[
               { href: "/shop", label: t.shop },
-              { href: "/orders", label: t.trackOrder },
+              { href: "/orders", label: "Order Status" },
               { href: "/contact", label: t.contact },
             ].map((link) => (
               <Link key={link.href} href={link.href} onClick={() => setMobileMenu(false)} style={{ display: "block", padding: "0.75rem 0.875rem", borderRadius: "0.75rem", fontSize: "0.9375rem", fontWeight: 600, color: "#475569", textDecoration: "none", background: "#f8faf9" }}>

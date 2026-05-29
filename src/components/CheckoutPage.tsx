@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { useLang } from "@/lib/language-context";
+import { useSettings } from "@/lib/use-settings";
 
 export default function CheckoutPage() {
   const { items, totalBdt, totalUsdt, clearCart } = useCart();
   const { t } = useLang();
+  const s = useSettings();
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState("bkash");
   const [trxId, setTrxId] = useState("");
@@ -121,7 +123,7 @@ export default function CheckoutPage() {
           <div style={{ padding: "1.125rem", borderRadius: "0.875rem", background: "linear-gradient(135deg, rgba(16,185,129,0.06), rgba(240,253,244,0.8))", border: "1px solid rgba(16,185,129,0.15)" }}>
             <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>{t.paymentInstructions}:</p>
             <p style={{ fontSize: "1.375rem", fontWeight: 800, color: "#047857", display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-              📱 01879-009680
+              📱 {s.payment_phone || "01879-009680"}
             </p>
             <p style={{ fontSize: "0.8125rem", color: "#475569", lineHeight: 1.6, fontWeight: 500 }}>
               Send <strong style={{ color: "#0f172a" }}>৳{totalBdt}</strong> as <strong>Send Money</strong> via{" "}

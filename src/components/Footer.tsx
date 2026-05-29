@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useLang } from "@/lib/language-context";
+import { useSettings } from "@/lib/use-settings";
 
 export default function Footer() {
   const { t } = useLang();
+  const s = useSettings();
 
   return (
     <footer
@@ -81,8 +83,10 @@ export default function Footer() {
             <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
               {[
                 { href: "/shop", label: t.shop },
-                { href: "/orders", label: t.trackOrder },
+                { href: "/orders", label: "Order Status" },
                 { href: "/contact", label: t.contact },
+                { href: "/terms", label: "Terms & Conditions" },
+                { href: "/refund", label: "Refund Policy" },
               ].map((link) => (
                 <Link
                   key={link.href}
@@ -116,20 +120,34 @@ export default function Footer() {
               {t.followUs}
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-              <a
-                href="https://t.me/"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", fontWeight: 600, color: "#64748b", textDecoration: "none" }}
-              >
-                <span>📱</span> Telegram Chat Support
-              </a>
-              <a
-                href="mailto:support@officialtoolstore.com"
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", fontWeight: 600, color: "#64748b", textDecoration: "none" }}
-              >
-                <span>✉️</span> Email Support Help
-              </a>
+              {s.telegram_link && (
+                <a
+                  href={s.telegram_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", fontWeight: 600, color: "#64748b", textDecoration: "none" }}
+                >
+                  <span>📱</span> Telegram Support
+                </a>
+              )}
+              {s.support_email && (
+                <a
+                  href={`mailto:${s.support_email}`}
+                  style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", fontWeight: 600, color: "#64748b", textDecoration: "none" }}
+                >
+                  <span>✉️</span> {s.support_email}
+                </a>
+              )}
+              {s.whatsapp_link && (
+                <a
+                  href={s.whatsapp_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", fontWeight: 600, color: "#64748b", textDecoration: "none" }}
+                >
+                  <span>💬</span> WhatsApp Support
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -140,12 +158,20 @@ export default function Footer() {
             borderTop: "1px solid rgba(0,0,0,0.07)",
             marginTop: "2.5rem",
             paddingTop: "1.5rem",
-            textAlign: "center",
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "0.5rem",
           }}
         >
           <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            © {new Date().getFullYear()} OfficialToolStore. {t.allRightsReserved}
+            © {new Date().getFullYear()} {s.store_name || "OfficialToolStore"}. {t.allRightsReserved}
           </p>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <Link href="/terms" style={{ fontSize: "0.75rem", fontWeight: 600, color: "#94a3b8", textDecoration: "none" }}>Terms</Link>
+            <Link href="/refund" style={{ fontSize: "0.75rem", fontWeight: 600, color: "#94a3b8", textDecoration: "none" }}>Refund Policy</Link>
+          </div>
         </div>
       </div>
     </footer>

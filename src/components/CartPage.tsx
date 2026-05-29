@@ -76,23 +76,43 @@ export default function CartPage() {
                   animationDelay: `${i * 60}ms`,
                 }}
               >
-                {/* Icon */}
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "0.75rem",
-                    background: item.iconBg,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.5rem",
-                    flexShrink: 0,
-                    border: "1px solid rgba(0,0,0,0.06)",
-                  }}
-                >
-                  {item.icon}
-                </div>
+                {/* Product image / icon */}
+                {item.image ? (
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: "0.75rem",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                      border: "1px solid rgba(0,0,0,0.07)",
+                      background: item.iconBg || "#f1f5f9",
+                    }}
+                  >
+                    <img
+                      src={item.image}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: "0.75rem",
+                      background: item.iconBg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.5rem",
+                      flexShrink: 0,
+                      border: "1px solid rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    {item.icon}
+                  </div>
+                )}
 
                 {/* Details */}
                 <div style={{ flex: 1, minWidth: 0 }}>

@@ -338,7 +338,7 @@ async function copyToClipboard(text: string) {
 /* ─────────────────────────────────────────
    ADMIN DASHBOARD
 ───────────────────────────────────────── */
-type TabType = "orders" | "products" | "analytics" | "credentials" | "reviews" | "support" | "staff";
+type TabType = "orders" | "products" | "analytics" | "credentials" | "reviews" | "support" | "staff" | "settings";
 
 /** Super User has full control; legacy "admin" role is treated as Super User. */
 function roleIsSuper(role: string): boolean {
@@ -878,6 +878,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
     { key: "reviews",    label: "Reviews",     icon: "⭐" },
     { key: "support",    label: "Support",     icon: "📩", badge: unresolvedCount || undefined },
     ...(isSuper ? [{ key: "staff" as TabType, label: "Staff", icon: "👥" }] : []),
+    ...(isSuper ? [{ key: "settings" as TabType, label: "Settings", icon: "⚙️" }] : []),
   ];
 
   /* ── Filtered products ── */
@@ -1597,6 +1598,11 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                   </div>
                 </div>
               )}
+
+              {/* ══ SETTINGS TAB ══ */}
+              {tab === "settings" && isSuper && (
+                <SettingsTab adminFetch={adminFetch} showToast={showToast} />
+              )}
             </>
           )}
         </main>
@@ -1772,6 +1778,131 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
           .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   SETTINGS TAB
+───────────────────────────────────────── */
+const SETTING_LABELS: Record<string, { label: string; hint: string; multiline?: boolean }> = {
+  store_name:      { label: "Store Name",         hint: "Displayed in footer and browser title" },
+  payment_phone:   { label: "Payment Phone",       hint: "Number shown on checkout (e.g. 01879-009680)" },
+  whatsapp_number: { label: "WhatsApp Number",     hint: "Digits only, with country code (e.g. 8801879009680)" },
+  whatsapp_link:   { label: "WhatsApp Link",       hint: "Full URL e.g. https://wa.me/8801879009680" },
+  telegram_link:   { label: "Telegram Link",       hint: "Full URL e.g. https://t.me/yourusername" },
+  support_email:   { label: "Support Email",       hint: "Shown in footer and contact page" },
+  terms_content:   { label: "Terms & Conditions",  hint: "Plain text shown on /terms page", multiline: true },
+  refund_content:  { label: "Refund Policy",       hint: "Plain text shown on /refund page", multiline: true },
+  privacy_content: { label: "Privacy Policy",      hint: "Plain text shown on /privacy page (optional)", multiline: true },
+};
+
+const ALL_SETTING_KEYS = Object.keys(SETTING_LABELS);
+
+function SettingsTab({ adminFetch, showToast }: {
+  adminFetch: (url: string, opts?: RequestInit) => Promise<Response>;
+  showToast: (msg: string, type?: "success" | "error" | "warn") => void;
+}) {
+  const [values, setValues]   = useState<Record<string, string>>({});
+  const [perms, setPerms]     = useState<Record<string, boolean>>({});
+  const [saving, setSaving]   = useState<string | null>(null);
+  const [loaded, setLoaded]   = useState(false);
+
+  useEffect(() => {
+    adminFetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const map: Record<string, string> = {};
+        const pm: Record<string, boolean> = {};
+        for (const k of ALL_SETTING_KEYS) map[k] = data.settings?.[k] ?? "";
+        for (const k of ALL_SETTING_KEYS) pm[k] = data.settings?.[`perm_${k}`] === "true";
+        setValues(map);
+        setPerms(pm);
+        setLoaded(true);
+      })
+      .catch(() => showToast("Failed to load settings", "error"));
+  }, []);
+
+  const save = async (key: string) => {
+    setSaving(key);
+    try {
+      const res = await adminFetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value: values[key] ?? "" }),
+      });
+      if (res.ok) showToast("Saved ✓");
+      else { const d = await res.json(); showToast(d.error || "Save failed", "error"); }
+    } catch { showToast("Save failed", "error"); }
+    setSaving(null);
+  };
+
+  const togglePerm = async (key: string) => {
+    const newVal = !perms[key];
+    setPerms((p) => ({ ...p, [key]: newVal }));
+    const res = await adminFetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: `perm_${key}`, value: newVal ? "true" : "false" }),
+    });
+    if (!res.ok) {
+      setPerms((p) => ({ ...p, [key]: !newVal }));
+      showToast("Permission update failed", "error");
+    } else showToast(`Moderator ${newVal ? "can" : "cannot"} now edit "${SETTING_LABELS[key]?.label}"`);
+  };
+
+  if (!loaded) return <div style={{ padding: "3rem", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}>Loading settings…</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <p style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600, margin: 0 }}>
+        Changes apply immediately site-wide. Toggle 🔓 to allow Moderators to edit individual settings.
+      </p>
+      {ALL_SETTING_KEYS.map((key) => {
+        const meta = SETTING_LABELS[key];
+        const isSaving = saving === key;
+        return (
+          <div key={key} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "1rem", padding: "1rem 1.25rem", display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+              <div>
+                <p style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.875rem", margin: 0 }}>{meta.label}</p>
+                <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 500, margin: 0 }}>{meta.hint}</p>
+              </div>
+              <button
+                onClick={() => togglePerm(key)}
+                title={perms[key] ? "Moderators can edit — click to restrict" : "Only Super Users can edit — click to allow moderators"}
+                style={{ height: 32, padding: "0 0.75rem", borderRadius: "0.625rem", border: `1px solid ${perms[key] ? "rgba(16,185,129,0.3)" : "#e2e8f0"}`, background: perms[key] ? "rgba(16,185,129,0.08)" : "#f8faf9", color: perms[key] ? "#059669" : "#94a3b8", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+              >
+                {perms[key] ? "🔓 Moderator can edit" : "🔒 Super User only"}
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+              {meta.multiline ? (
+                <textarea
+                  value={values[key] ?? ""}
+                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                  rows={5}
+                  style={{ flex: 1, padding: "0.625rem 0.875rem", borderRadius: "0.75rem", border: "1.5px solid #e2e8f0", fontSize: "0.875rem", fontFamily: "inherit", color: "#0f172a", resize: "vertical", outline: "none" }}
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={values[key] ?? ""}
+                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                  style={{ flex: 1, height: 42, padding: "0 0.875rem", borderRadius: "0.75rem", border: "1.5px solid #e2e8f0", fontSize: "0.875rem", fontFamily: "inherit", color: "#0f172a", outline: "none" }}
+                />
+              )}
+              <button
+                onClick={() => save(key)}
+                disabled={isSaving}
+                style={{ height: 42, padding: "0 1rem", borderRadius: "0.75rem", background: isSaving ? "#94a3b8" : "linear-gradient(135deg,#00c853,#059669)", border: "none", color: "#fff", fontWeight: 700, fontSize: "0.8125rem", cursor: isSaving ? "not-allowed" : "pointer", fontFamily: "inherit", flexShrink: 0 }}
+              >
+                {isSaving ? "…" : "Save"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

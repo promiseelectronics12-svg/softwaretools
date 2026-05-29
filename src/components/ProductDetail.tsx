@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useLang } from "@/lib/language-context";
 import { useCart, type CartItem } from "@/lib/cart-context";
+import { useSettings } from "@/lib/use-settings";
 
 interface Product {
   id: number;
@@ -30,6 +31,7 @@ export default function ProductDetail() {
   const params = useParams();
   const { lang, t } = useLang();
   const { addToCart } = useCart();
+  const s = useSettings();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPkg, setSelectedPkg] = useState(0);
@@ -399,7 +401,7 @@ export default function ProductDetail() {
               {added ? "✓ Added to Cart!" : t.addToCart}
             </button>
             <a
-              href={`https://wa.me/8801879009680?text=Hi, I'm interested in buying ${name} (${pkg.duration})`}
+              href={`${s.whatsapp_link || "https://wa.me/8801879009680"}?text=Hi, I'm interested in buying ${name} (${pkg.duration})`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-ghost"

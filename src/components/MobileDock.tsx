@@ -151,7 +151,7 @@ export default function MobileDock() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
               {[
                 { href: "/shop", icon: "🛍️", labelEn: "Shop", labelBn: "শপ" },
-                { href: "/orders", icon: "📦", labelEn: "Track Order", labelBn: "অর্ডার ট্র্যাক" },
+                { href: "/orders", icon: "📦", labelEn: "Order Status", labelBn: "অর্ডার ট্র্যাক" },
                 { href: "/contact", icon: "📞", labelEn: "Contact", labelBn: "যোগাযোগ" },
                 { href: "/cart", icon: "🛒", labelEn: "Cart", labelBn: "কার্ট" },
               ].map((link) => (
