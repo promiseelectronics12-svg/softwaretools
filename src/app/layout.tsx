@@ -37,7 +37,7 @@ export default function RootLayout({
         />
         <meta name="theme-color" content="#f5f7f5" />
         {/* PWA */}
-        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="DiziStore" />

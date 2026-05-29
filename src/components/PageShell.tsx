@@ -30,6 +30,7 @@ export default function PageShell({
           flex: 1,
           display: "flex",
           flexDirection: "column",
+          paddingBottom: `calc(60px + env(safe-area-inset-bottom, 0px))`, // Space for MobileDock + Safe Area
         }}
       >
         {children}
