@@ -35,6 +35,7 @@ export default function ProductDetail() {
   const [selectedPkg, setSelectedPkg] = useState(0);
   const [added, setAdded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [fetchError, setFetchError] = useState(false);
 
   const loadProduct = () => {
@@ -167,6 +168,9 @@ export default function ProductDetail() {
               justifyContent: "center"
             }}
           >
+            {!imageLoaded && !imageError && (
+              <div className="skeleton" style={{ position: "absolute", inset: 0, borderRadius: "1.25rem", zIndex: 5 }} />
+            )}
             {imageError ? (
               <div style={{ textAlign: "center", color: "#94a3b8" }}>
                 <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>🖼️</div>
@@ -176,12 +180,15 @@ export default function ProductDetail() {
               <img
                 src={product.image}
                 alt={name}
+                onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
                 style={{
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
-                  display: "block"
+                  display: "block",
+                  transition: "opacity 0.4s ease",
+                  opacity: imageLoaded ? 1 : 0
                 }}
               />
             )}

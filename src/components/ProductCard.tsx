@@ -31,6 +31,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
   const [selectedPkg, setSelectedPkg] = useState(0);
   const [added, setAdded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const isInCart = items.some((i) => i.id === product.id);
   const pkg = product.packages[selectedPkg] || product.packages[0];
@@ -69,6 +70,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
       >
         {/* Product Image */}
         <div style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", backgroundColor: "#f8faf9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {!imageLoaded && !imageError && (
+            <div className="skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0, zIndex: 5 }} />
+          )}
           {imageError ? (
             <div style={{ textAlign: "center", color: "#94a3b8" }}>
               <div style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>🖼️</div>
@@ -79,13 +83,15 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
               src={product.image}
               alt={name}
               loading="lazy"
+              onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
               style={{
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                transition: "transform 0.6s ease",
+                transition: "opacity 0.4s ease, transform 0.6s ease",
                 display: "block",
+                opacity: imageLoaded ? 1 : 0,
               }}
               className="card-img"
             />
@@ -127,6 +133,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
         {/* Card Body */}
         <div
+          className="card-mobile-body"
           style={{
             padding: "0.875rem",
             display: "flex",
@@ -180,7 +187,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             {/* Duration chips */}
             {product.packages.length > 1 && (
               <div 
-                className="no-scrollbar"
+                className="no-scrollbar card-chips-row"
                 style={{ 
                   display: "flex", 
                   gap: "0.375rem", 
@@ -219,6 +226,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
           {/* Price + CTA — always pinned at bottom */}
           <div
+            className="card-cta-row"
             style={{
               display: "flex",
               alignItems: "center",
@@ -231,12 +239,13 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "0.125rem", minWidth: 0, flex: 1 }}>
-              <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.1 }}>৳{pkg.bdt}</span>
+              <span className="card-price-main" style={{ fontSize: "1.125rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.1 }}>৳{pkg.bdt}</span>
               <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 700 }}>
                 {pkg.usdt} USDT
               </span>
             </div>
             <button
+              className="card-cta-btn"
               onClick={handleAdd}
               disabled={isInCart && !added}
               style={{

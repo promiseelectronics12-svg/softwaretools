@@ -140,6 +140,46 @@ button {
 }
 
 /* =====================================================
+   PRODUCT CARD — mobile tightening (2-col grid)
+   Below 600px the column is ~46vw wide, not enough
+   for side-by-side price + button. Stack vertically
+   and shrink paddings/font so nothing gets clipped.
+   ===================================================== */
+@media (max-width: 599px) {
+  /* Card body padding tighter on mobile */
+  .card-mobile-body {
+    padding: 0.625rem !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Price + CTA row: stack on very small screens */
+  .card-cta-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.4rem !important;
+  }
+
+  /* Make button full-width and shorter on mobile */
+  .card-cta-btn {
+    width: 100% !important;
+    min-height: 34px !important;
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.6875rem !important;
+  }
+
+  /* Smaller price on mobile */
+  .card-price-main {
+    font-size: 0.9375rem !important;
+  }
+
+  /* Duration chips: wrap instead of scroll to avoid height blowout */
+  .card-chips-row {
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+  }
+}
+
+/* =====================================================
    BENTO GRID
    ===================================================== */
 .bento-grid {
