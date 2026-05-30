@@ -338,7 +338,7 @@ async function copyToClipboard(text: string) {
 /* ─────────────────────────────────────────
    ADMIN DASHBOARD
 ───────────────────────────────────────── */
-type TabType = "orders" | "products" | "analytics" | "credentials" | "reviews" | "support" | "staff" | "settings";
+type TabType = "orders" | "products" | "analytics" | "credentials" | "reviews" | "support" | "staff" | "links" | "settings";
 
 /** Super User has full control; legacy "admin" role is treated as Super User. */
 function roleIsSuper(role: string): boolean {
@@ -729,6 +729,14 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
     }, { confirmLabel: "Delete Product" });
   };
 
+  const toggleIsTop = async (p: Product) => {
+    const res = await adminFetch(`/api/products/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isTop: !p.isTop }) });
+    if (res.ok) {
+      setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, isTop: !x.isTop } : x));
+      showToast(p.isTop ? `${p.nameEn} removed from Top` : `${p.nameEn} pinned to Top 🔥`);
+    }
+  };
+
   const updateStock = async (p: Product) => {
     const val = parseInt(stockEdits[p.id] ?? String(p.stock));
     if (isNaN(val) || val < 0) { showToast("Invalid stock value", "error"); return; }
@@ -878,6 +886,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
     { key: "reviews",    label: "Reviews",     icon: "⭐" },
     { key: "support",    label: "Support",     icon: "📩", badge: unresolvedCount || undefined },
     ...(isSuper ? [{ key: "staff" as TabType, label: "Staff", icon: "👥" }] : []),
+    { key: "links" as TabType, label: "Links", icon: "🔗" },
     ...(isSuper ? [{ key: "settings" as TabType, label: "Settings", icon: "⚙️" }] : []),
   ];
 
@@ -1252,7 +1261,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                           <label style={{ fontSize: "0.6875rem", fontWeight: 700, color: isLow ? "#b45309" : "#64748b", textTransform: "uppercase" }}>Stock</label>
                           <input type="number" min={0} value={stockEdits[p.id] ?? p.stock} onChange={(e) => setStockEdits((prev) => ({ ...prev, [p.id]: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") updateStock(p); }} onBlur={() => updateStock(p)} style={{ ...INP, width: 70, height: 34, padding: "0 0.5rem", textAlign: "center", borderColor: isLow ? "#fde68a" : "#e2e8f0" }} />
                         </div>
-                        {p.isTop && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#047857", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.15rem 0.5rem", borderRadius: "9999px" }}>TOP</span>}
+                        <button onClick={() => toggleIsTop(p)} title={p.isTop ? "Remove from Top" : "Pin to Top"} style={{ fontSize: "0.6875rem", fontWeight: 700, color: p.isTop ? "#047857" : "#94a3b8", background: p.isTop ? "#f0fdf4" : "#f8fafc", border: `1px solid ${p.isTop ? "#bbf7d0" : "#e2e8f0"}`, padding: "0.15rem 0.5rem", borderRadius: "9999px", cursor: "pointer", fontFamily: "inherit" }}>{p.isTop ? "🔥 TOP" : "☆ Top"}</button>
                         {isLow && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", padding: "0.15rem 0.5rem", borderRadius: "9999px" }}>LOW</span>}
                         <div style={{ display: "flex", gap: "0.375rem" }}>
                           <button onClick={() => startEdit(p)} style={{ ...BTN("blue"), height: 34 }}>Edit</button>
@@ -1599,6 +1608,11 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                 </div>
               )}
 
+              {/* ══ LINKS TAB ══ */}
+              {tab === "links" && (
+                <LinksTab products={products} adminFetch={adminFetch} showToast={showToast} />
+              )}
+
               {/* ══ SETTINGS TAB ══ */}
               {tab === "settings" && isSuper && (
                 <SettingsTab adminFetch={adminFetch} showToast={showToast} />
@@ -1816,6 +1830,128 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
           .admin-mobile-nav span[style] { font-size: 0.5rem !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   LINKS TAB
+───────────────────────────────────────── */
+interface ShortLink { id: number; code: string; label: string; clicks: number; productId: number; productName: string | null; createdAt: string; }
+
+function LinksTab({ products, adminFetch, showToast }: {
+  products: { id: number; nameEn: string }[];
+  adminFetch: (url: string, opts?: RequestInit) => Promise<Response>;
+  showToast: (msg: string, type?: "success" | "error" | "warn") => void;
+}) {
+  const [links, setLinks] = useState<ShortLink[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [code, setCode] = useState("");
+  const [label, setLabel] = useState("");
+  const [productId, setProductId] = useState<string>("");
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState<number | null>(null);
+
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const load = () => {
+    adminFetch("/api/links").then((r) => r.json()).then((d) => { setLinks(d.links || []); setLoaded(true); }).catch(() => setLoaded(true));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productId) { showToast("Select a product", "warn"); return; }
+    setCreating(true);
+    const res = await adminFetch("/api/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code, label, productId: parseInt(productId) }) });
+    const data = await res.json();
+    if (res.ok) { showToast(`Link /${data.link.code} created ✓`); setCode(""); setLabel(""); setProductId(""); load(); }
+    else showToast(data.error || "Failed", "error");
+    setCreating(false);
+  };
+
+  const remove = async (id: number) => {
+    await adminFetch(`/api/links?id=${id}`, { method: "DELETE" });
+    setLinks((prev) => prev.filter((l) => l.id !== id));
+    showToast("Link deleted");
+  };
+
+  const copy = async (link: ShortLink) => {
+    await navigator.clipboard.writeText(`${baseUrl}/s/${link.code}`).catch(() => {});
+    setCopied(link.id);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  if (!loaded) return <div style={{ padding: "3rem", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}>Loading…</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <p style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600, margin: 0 }}>
+        Short links redirect to product pages. Share on Facebook or any platform. Clicks are tracked.
+      </p>
+
+      {/* Create form */}
+      <form onSubmit={create} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "1rem", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <h3 style={{ fontWeight: 800, fontSize: "0.875rem", color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>Create New Link</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,200px),1fr))", gap: "0.875rem" }}>
+          <div>
+            <label style={LABEL}>Product *</label>
+            <select required value={productId} onChange={(e) => setProductId(e.target.value)} style={{ ...INP, height: 42, cursor: "pointer" }}>
+              <option value="">— Select product —</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.nameEn}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={LABEL}>Short code * <span style={{ color: "#94a3b8", fontSize: "0.625rem", fontWeight: 500 }}>(letters, numbers, hyphens)</span></label>
+            <input value={code} onChange={(e) => setCode(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="e.g. chatgpt-1mo" style={INP} required minLength={2} maxLength={50} />
+          </div>
+          <div>
+            <label style={LABEL}>Label <span style={{ color: "#94a3b8", fontSize: "0.625rem" }}>(optional note)</span></label>
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. FB Post Jan" style={INP} maxLength={100} />
+          </div>
+        </div>
+        {code && (
+          <p style={{ fontSize: "0.8125rem", color: "#059669", fontWeight: 700, margin: 0 }}>
+            Preview: <span style={{ fontFamily: "monospace" }}>{baseUrl}/s/{code}</span>
+          </p>
+        )}
+        <button type="submit" disabled={creating} style={{ ...BTN("green"), height: 42, alignSelf: "flex-start", padding: "0 1.5rem", fontSize: "0.875rem" }}>
+          {creating ? "Creating…" : "Create Link →"}
+        </button>
+      </form>
+
+      {/* Links list */}
+      {links.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "3rem 0", color: "#94a3b8" }}>
+          <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🔗</div>
+          <p style={{ fontWeight: 700, color: "#64748b" }}>No short links yet</p>
+          <p style={{ fontSize: "0.8125rem" }}>Create one above to start sharing</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          {links.map((l) => (
+            <div key={l.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.875rem", padding: "0.875rem 1.125rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "0.9375rem", color: "#059669" }}>/s/{l.code}</span>
+                  {l.label && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "0.1rem 0.5rem", borderRadius: "9999px" }}>{l.label}</span>}
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, margin: "0.2rem 0 0" }}>→ {l.productName || `Product #${l.productId}`}</p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#0891b2", background: "#ecfeff", border: "1px solid #a5f3fc", padding: "0.2rem 0.625rem", borderRadius: "9999px" }}>
+                  👁 {l.clicks} clicks
+                </span>
+                <button onClick={() => copy(l)} style={{ ...BTN(copied === l.id ? "green" : "blue"), height: 32 }}>
+                  {copied === l.id ? "✓ Copied!" : "📋 Copy"}
+                </button>
+                <button onClick={() => remove(l.id)} style={{ ...BTN("red"), height: 32 }}>Del</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

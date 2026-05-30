@@ -164,6 +164,17 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Short marketing links — /s/[code] → /product/[id]
+// Used for Facebook post boosting without exposing product IDs.
+export const shortLinks = pgTable("short_links", {
+  id:        serial("id").primaryKey(),
+  code:      varchar("code", { length: 50 }).notNull().unique(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  label:     varchar("label", { length: 100 }).notNull().default(""),
+  clicks:    integer("clicks").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Site-wide settings editable from admin panel.
 // Super User can edit all. Super User can grant moderators edit access per key
 // by setting a companion key: "perm_<key>" = "true".
