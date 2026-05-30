@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     orderId, orderCode, phone, productName, duration,
-    username, password, notes, startDate, expiryDate,
+    username, password, notes, totpSecret, startDate, expiryDate,
   } = body;
 
   if (!orderCode || !phone || !productName || !username || !password || !startDate || !expiryDate) {
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       username,
       password,
       notes: notes || "",
+      totpSecret: (typeof totpSecret === "string" && totpSecret.trim()) ? totpSecret.trim() : null,
       startDate: new Date(startDate),
       expiryDate: new Date(expiryDate),
       isReclaimed: false,

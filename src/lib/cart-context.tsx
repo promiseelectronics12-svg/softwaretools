@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+
+const CART_STORAGE_KEY = "dizi_cart";
 
 export interface CartItem {
   id: number;
@@ -30,6 +32,28 @@ const CartContext = createContext<CartContextType | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Load cart from localStorage on mount (survives full page reloads / PWA SW navigations)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CART_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setItems(parsed);
+      }
+    } catch {}
+    setHydrated(true);
+  }, []);
+
+  // Persist cart whenever it changes (only after initial hydration to avoid
+  // overwriting stored cart with the empty initial state)
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+    } catch {}
+  }, [items, hydrated]);
 
   const addToCart = useCallback((item: CartItem) => {
     setItems((prev) => {

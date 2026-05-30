@@ -126,7 +126,7 @@ export default function ProductDetail() {
   };
 
   return (
-    <div style={{ maxWidth: "1200px", width: "100%", margin: "0 auto", padding: "1.5rem 1.5rem 6rem 1.5rem" }}>
+    <div className="pd-root" style={{ maxWidth: "1200px", width: "100%", margin: "0 auto", padding: "1.5rem 1.5rem 6rem 1.5rem" }}>
       {/* Breadcrumbs - Responsive horizontal scroll support */}
       <nav 
         className="animate-fade-up no-scrollbar"
@@ -485,6 +485,36 @@ export default function ProductDetail() {
         </div>
       </div>
 
+      {/* Mobile fixed Add-to-Cart bar — rendered at pd-root level (no transformed
+          ancestor) so position:fixed truly pins to the viewport. Hidden on desktop. */}
+      <div className="pd-cta-fixed">
+        <button
+          onClick={handleAdd}
+          style={{
+            flex: 1, minHeight: "3.25rem", borderRadius: "1.25rem", fontSize: "0.875rem", fontWeight: "700",
+            border: added ? "1px solid rgba(16,185,129,0.3)" : "none",
+            background: added ? "rgba(16,185,129,0.1)" : "linear-gradient(135deg,#00c853,#059669)",
+            color: added ? "#059669" : "#fff",
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            cursor: added ? "default" : "pointer", fontFamily: "inherit",
+            boxShadow: added ? "none" : "0 4px 12px rgba(16,185,129,0.25)",
+          }}
+        >
+          {added ? "✓ Added to Cart!" : t.addToCart}
+        </button>
+        <a
+          href={`${s.whatsapp_link || "https://wa.me/8801879009680"}?text=Hi, I'm interested in buying ${name} (${pkg.duration})`}
+          target="_blank" rel="noopener noreferrer"
+          style={{
+            flex: 1, minHeight: "3.25rem", borderRadius: "1.25rem", fontSize: "0.875rem", fontWeight: "700",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+            textDecoration: "none", background: "#f8fafc", border: "1.5px solid #e2e8f0", color: "#475569",
+          }}
+        >
+          <span>💬</span><span>WhatsApp</span>
+        </a>
+      </div>
+
       {/* Embedded CSS Style rules for breakpoints */}
       <style dangerouslySetInnerHTML={{ __html: `
         .product-detail-grid {
@@ -517,20 +547,28 @@ export default function ProductDetail() {
             grid-template-columns: repeat(2, 1fr);
           }
         }
-        /* Mobile: pin Add-to-Cart above the fixed bottom dock so it's never hidden */
+        /* Desktop: inline CTA inside the product column.
+           Mobile: hide inline, show the fixed bar (rendered at pd-root level,
+           outside the transformed .animate-slide-right ancestor so it truly pins). */
+        .pd-cta-fixed { display: none; }
         @media (max-width: 767px) {
-          .pd-cta {
-            position: sticky;
-            bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-            z-index: 30;
-            background: rgba(255, 255, 255, 0.96);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 0.75rem;
-            border-radius: 1.25rem;
-            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(0, 0, 0, 0.05);
+          .pd-cta { display: none !important; }
+          .pd-cta-fixed {
+            display: flex !important;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: calc(72px + env(safe-area-inset-bottom, 0px)); /* above the ~61px MobileDock */
+            z-index: 45;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-top: 1px solid #e2e8f0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
           }
+          .pd-root { padding-bottom: 11rem !important; }
         }
       `}} />
     </div>
