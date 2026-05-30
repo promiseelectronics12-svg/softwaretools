@@ -377,6 +377,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
   /* ── Quick Deliver ── */
   const [quickDeliverOrderId, setQuickDeliverOrderId] = useState<number | null>(null);
   const [quickForms, setQuickForms] = useState<{ username: string; password: string; totpSecret: string; notes: string; expiryDate: string }[]>([]);
+  const [quickSelected, setQuickSelected] = useState<Set<number>>(new Set()); // indices selected for delivery
   const [quickDelivering, setQuickDelivering] = useState(false);
   const [copiedCredId, setCopiedCredId]       = useState<number | null>(null);
 
@@ -696,30 +697,42 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
       return { username: "", password: "", totpSecret: "", notes: "", expiryDate: expiry };
     });
     setQuickForms(forms.length > 0 ? forms : [{ username: "", password: "", totpSecret: "", notes: "", expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0] }]);
+    // Pre-select only items not yet delivered
+    const alreadyDelivered = new Set(
+      credentials.filter((c) => c.orderCode === order.orderCode).map((c) => c.productName)
+    );
+    const selected = new Set(
+      order.items.map((item, idx) => idx).filter((idx) => !alreadyDelivered.has(order.items[idx].nameEn))
+    );
+    setQuickSelected(selected);
     setQuickDeliverOrderId(order.id);
     setExpandedOrders((prev) => { const next = new Set(prev); next.add(order.id); return next; });
   };
 
   const handleQuickDeliver = async (order: Order) => {
-    for (let i = 0; i < quickForms.length; i++) {
-      if (!quickForms[i].username.trim() || !quickForms[i].password.trim()) {
-        showToast(`Enter username & password for ${order.items[i]?.nameEn || `item ${i + 1}`}`, "error");
+    const toDeliver = order.items.filter((_, idx) => quickSelected.has(idx));
+    if (toDeliver.length === 0) { showToast("Select at least one item to deliver", "warn"); return; }
+
+    for (const idx of quickSelected) {
+      const form = quickForms[idx];
+      if (!form?.username.trim() || !form?.password.trim()) {
+        showToast(`Enter username & password for ${order.items[idx]?.nameEn || `item ${idx + 1}`}`, "error");
         return;
       }
     }
+
     setQuickDelivering(true);
     try {
       const newCreds: typeof credentials = [];
-      for (let i = 0; i < order.items.length; i++) {
-        const item = order.items[i];
-        const form = quickForms[i] ?? quickForms[0];
+      for (const idx of quickSelected) {
+        const item = order.items[idx];
+        const form = quickForms[idx];
         const credRes = await adminFetch("/api/credentials", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             orderId: order.id, orderCode: order.orderCode,
             phone: order.phone || "",
-            productName: item.nameEn,
-            duration: item.duration,
+            productName: item.nameEn, duration: item.duration,
             username: form.username.trim(), password: form.password.trim(),
             notes: form.notes.trim(),
             totpSecret: form.totpSecret.trim() || null,
@@ -728,19 +741,32 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
           }),
         });
         const credData = await credRes.json();
-        if (!credData.credential) { showToast(`Failed to save credential for ${item.nameEn}`, "error"); setQuickDelivering(false); return; }
+        if (!credData.credential) { showToast(`Failed: ${item.nameEn}`, "error"); setQuickDelivering(false); return; }
         newCreds.push(credData.credential);
       }
-      setCredentials((prev) => [...prev, ...newCreds]);
+      const allCreds = [...credentials, ...newCreds];
+      setCredentials(allCreds);
 
-      const ordRes = await adminFetch(`/api/orders/${order.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "completed" }) });
+      // All items delivered? → completed. Some still pending? → verified
+      const deliveredNames = new Set(allCreds.filter((c) => c.orderCode === order.orderCode).map((c) => c.productName));
+      const allDone = order.items.every((item) => deliveredNames.has(item.nameEn));
+      const newStatus = allDone ? "completed" : "verified";
+
+      const ordRes = await adminFetch(`/api/orders/${order.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus }) });
       const ordData = await ordRes.json();
       if (ordData.order) setOrders((prev) => prev.map((o) => o.id === order.id ? ordData.order : o));
 
       setQuickDeliverOrderId(null);
       setQuickForms([]);
+      setQuickSelected(new Set());
       setExpandedOrders((prev) => { const next = new Set(prev); next.delete(order.id); return next; });
-      showToast(`✓ ${newCreds.length} credential${newCreds.length > 1 ? "s" : ""} delivered to ${order.phone || order.orderCode}!`);
+
+      if (allDone) {
+        showToast(`✓ All ${newCreds.length} credentials delivered — order complete!`);
+      } else {
+        const remaining = order.items.length - deliveredNames.size;
+        showToast(`✓ ${newCreds.length} delivered — ${remaining} still pending`, "warn");
+      }
     } catch { showToast("Delivery failed", "error"); }
     setQuickDelivering(false);
   };
@@ -1221,63 +1247,89 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                                     </div>
 
                                     {/* One card per item */}
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem", marginBottom: "1.125rem" }}>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.125rem" }}>
                                       {o.items.map((item, idx) => {
                                         const form = quickForms[idx];
-                                        if (!form) return null;
+                                        const alreadyDelivered = credentials.some((c) => c.orderCode === o.orderCode && c.productName === item.nameEn);
+                                        const isSelected = quickSelected.has(idx);
+
                                         return (
-                                          <div key={idx} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.875rem", padding: "1rem 1.125rem" }}>
-                                            {/* Item header */}
-                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.875rem" }}>
-                                              <span style={{ width: 22, height: 22, borderRadius: "9999px", background: "rgba(16,185,129,0.1)", border: "1.5px solid rgba(16,185,129,0.25)", fontSize: "0.6875rem", fontWeight: 800, color: "#059669", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</span>
-                                              <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "#0f172a" }}>{item.nameEn}</span>
-                                              <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>· {item.duration}</span>
+                                          <div key={idx} style={{ background: alreadyDelivered ? "#f0fdf4" : isSelected ? "#fff" : "#f8fafc", border: `1px solid ${alreadyDelivered ? "#bbf7d0" : isSelected ? "#e2e8f0" : "#e2e8f0"}`, borderRadius: "0.875rem", padding: "0.875rem 1rem", opacity: !isSelected && !alreadyDelivered ? 0.6 : 1 }}>
+
+                                            {/* Item header with checkbox */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: alreadyDelivered || !isSelected ? 0 : "0.875rem" }}>
+                                              {alreadyDelivered ? (
+                                                <span style={{ fontSize: "1rem", flexShrink: 0 }}>✅</span>
+                                              ) : (
+                                                <input type="checkbox" checked={isSelected}
+                                                  onChange={() => setQuickSelected((prev) => { const next = new Set(prev); isSelected ? next.delete(idx) : next.add(idx); return next; })}
+                                                  style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0, accentColor: "#10b981" }}
+                                                />
+                                              )}
+                                              <span style={{ width: 20, height: 20, borderRadius: "9999px", background: alreadyDelivered ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.1)", fontSize: "0.625rem", fontWeight: 800, color: alreadyDelivered ? "#059669" : "#64748b", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</span>
+                                              <span style={{ fontWeight: 700, fontSize: "0.875rem", color: alreadyDelivered ? "#15803d" : "#0f172a", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.nameEn}</span>
+                                              <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 600, flexShrink: 0 }}>{item.duration}</span>
+                                              {alreadyDelivered && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#059669", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.1rem 0.5rem", borderRadius: "9999px", flexShrink: 0 }}>Delivered</span>}
+                                              {!alreadyDelivered && !isSelected && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#94a3b8", flexShrink: 0 }}>Skipped</span>}
                                             </div>
-                                            {/* Credential fields */}
-                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "0.75rem" }}>
-                                              {[
-                                                { label: "Username / Email *", key: "username", ph: "user@example.com" },
-                                                { label: "Password *",         key: "password", ph: "••••••••" },
-                                                { label: "TOTP Secret (opt.)", key: "totpSecret", ph: "JBSWY3DPEHPK3PXP" },
-                                                { label: "Notes (opt.)",       key: "notes",     ph: "e.g. profile name..." },
-                                              ].map((f) => (
-                                                <div key={f.key}>
-                                                  <label style={LABEL}>{f.label}</label>
-                                                  <input
-                                                    type="text" placeholder={f.ph}
-                                                    value={(form as Record<string, string>)[f.key]}
-                                                    onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], [f.key]: e.target.value }; return next; })}
-                                                    style={{ ...INP, fontFamily: f.key === "totpSecret" ? "monospace" : "inherit" }}
-                                                  />
+
+                                            {/* Credential fields — only if selected and not already delivered */}
+                                            {!alreadyDelivered && isSelected && form && (
+                                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "0.75rem" }}>
+                                                {[
+                                                  { label: "Username / Email *", key: "username", ph: "user@example.com" },
+                                                  { label: "Password *",         key: "password", ph: "••••••••" },
+                                                  { label: "TOTP Secret (opt.)", key: "totpSecret", ph: "JBSWY3DPEHPK3PXP" },
+                                                  { label: "Notes (opt.)",       key: "notes",     ph: "e.g. profile name..." },
+                                                ].map((f) => (
+                                                  <div key={f.key}>
+                                                    <label style={LABEL}>{f.label}</label>
+                                                    <input type="text" placeholder={f.ph}
+                                                      value={(form as Record<string, string>)[f.key]}
+                                                      onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], [f.key]: e.target.value }; return next; })}
+                                                      style={{ ...INP, fontFamily: f.key === "totpSecret" ? "monospace" : "inherit" }}
+                                                    />
+                                                  </div>
+                                                ))}
+                                                <div>
+                                                  <label style={LABEL}>Expiry Date *</label>
+                                                  <input type="date" value={form.expiryDate}
+                                                    onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], expiryDate: e.target.value }; return next; })}
+                                                    style={INP} />
                                                 </div>
-                                              ))}
-                                              <div>
-                                                <label style={LABEL}>Expiry Date *</label>
-                                                <input type="date" value={form.expiryDate}
-                                                  onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], expiryDate: e.target.value }; return next; })}
-                                                  style={INP} />
                                               </div>
-                                            </div>
+                                            )}
                                           </div>
                                         );
                                       })}
                                     </div>
 
-                                    {/* Action buttons */}
-                                    <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap" }}>
-                                      <button
-                                        disabled={quickDelivering}
-                                        onClick={() => handleQuickDeliver(o)}
-                                        style={{ height: 42, padding: "0 1.5rem", background: quickDelivering ? "#94a3b8" : "linear-gradient(135deg,#00c853,#059669)", border: "none", borderRadius: "0.75rem", color: "#fff", fontSize: "0.875rem", fontWeight: 800, cursor: quickDelivering ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 12px rgba(16,185,129,0.25)" }}
-                                      >
-                                        {quickDelivering ? "Delivering..." : `✓ Deliver ${o.items.length > 1 ? `${o.items.length} Credentials` : "& Complete"}`}
-                                      </button>
-                                      {o.status === "pending" && (
-                                        <button onClick={() => updateOrderStatus(o.id, "verified")} style={{ ...BTN("blue"), height: 42, padding: "0 1.125rem" }}>✓ Verify First</button>
-                                      )}
-                                      <button onClick={() => updateOrderStatus(o.id, "failed")} style={{ ...BTN("red"), height: 42, padding: "0 1.125rem" }}>✗ Fail Order</button>
-                                      <button onClick={() => setQuickDeliverOrderId(null)} style={{ ...BTN("ghost"), height: 42, padding: "0 1rem" }}>Cancel</button>
-                                    </div>
+                                    {/* Summary + action buttons */}
+                                    {(() => {
+                                      const selectedCount = quickSelected.size;
+                                      const alreadyCount  = o.items.filter((item) => credentials.some((c) => c.orderCode === o.orderCode && c.productName === item.nameEn)).length;
+                                      const remaining     = o.items.length - alreadyCount - selectedCount;
+                                      const allWillBeDone = alreadyCount + selectedCount >= o.items.length;
+                                      return (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                                          {selectedCount < o.items.length - alreadyCount && (
+                                            <div style={{ padding: "0.625rem 0.875rem", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "0.75rem", fontSize: "0.8125rem", fontWeight: 600, color: "#92400e" }}>
+                                              ⚠️ Partial delivery — {remaining} item{remaining !== 1 ? "s" : ""} will remain pending. Order stays &quot;verified&quot; until all are delivered.
+                                            </div>
+                                          )}
+                                          <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap" }}>
+                                            <button disabled={quickDelivering || selectedCount === 0}
+                                              onClick={() => handleQuickDeliver(o)}
+                                              style={{ height: 42, padding: "0 1.5rem", background: quickDelivering || selectedCount === 0 ? "#94a3b8" : "linear-gradient(135deg,#00c853,#059669)", border: "none", borderRadius: "0.75rem", color: "#fff", fontSize: "0.875rem", fontWeight: 800, cursor: quickDelivering || selectedCount === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: selectedCount > 0 ? "0 4px 12px rgba(16,185,129,0.25)" : "none" }}>
+                                              {quickDelivering ? "Delivering..." : allWillBeDone ? `✓ Deliver ${selectedCount} — Complete Order` : `⚡ Deliver ${selectedCount} of ${o.items.length}`}
+                                            </button>
+                                            {o.status === "pending" && <button onClick={() => updateOrderStatus(o.id, "verified")} style={{ ...BTN("blue"), height: 42, padding: "0 1.125rem" }}>✓ Verify First</button>}
+                                            <button onClick={() => updateOrderStatus(o.id, "failed")} style={{ ...BTN("red"), height: 42, padding: "0 1.125rem" }}>✗ Fail Order</button>
+                                            <button onClick={() => setQuickDeliverOrderId(null)} style={{ ...BTN("ghost"), height: 42, padding: "0 1rem" }}>Cancel</button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 )}
 
