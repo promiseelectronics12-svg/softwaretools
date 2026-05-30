@@ -6,6 +6,16 @@ const PUSH_DISMISSED_KEY = "dizi_push_dismissed";
 const PUSH_SUBSCRIBED_KEY = "dizi_push_subscribed";
 const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// VAPID public key → Uint8Array (ArrayBuffer-backed) for pushManager.subscribe
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const out = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) out[i] = rawData.charCodeAt(i);
+  return out;
+}
+
 interface PushManagerProps {
   phone: string;
   deviceId: string;
@@ -16,43 +26,49 @@ export default function PushManager({ phone, deviceId, token }: PushManagerProps
   const [showBanner, setShowBanner] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
 
+  // Ensure a push subscription exists on this device AND is saved server-side.
+  // Creates one if missing (permission already granted). Idempotent upsert, so
+  // running it every visit keeps the admin's customer list accurate.
+  const ensureSubscribed = useCallback(async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      let sub = await registration.pushManager.getSubscription();
+      if (!sub) {
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
+        if (!vapidKey) { console.warn("[Push] VAPID key missing"); return; }
+        sub = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
+        });
+      }
+      await saveSubscription(sub);
+      localStorage.setItem(PUSH_SUBSCRIBED_KEY, "true");
+    } catch (e) {
+      console.error("[Push] ensureSubscribed failed:", e);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, deviceId]);
+
   useEffect(() => {
-    // Don't show if already subscribed
-    if (localStorage.getItem(PUSH_SUBSCRIBED_KEY) === "true") return;
-
-    // Don't show if recently dismissed
-    const dismissed = localStorage.getItem(PUSH_DISMISSED_KEY);
-    if (dismissed && Date.now() - parseInt(dismissed) < DISMISS_DURATION_MS) return;
-
-    // Don't show if browser doesn't support push
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-
-    // Don't show if already granted or denied
     if (Notification.permission === "denied") return;
+
+    // Permission already granted → make sure a subscription exists & is saved.
+    // Runs every visit (idempotent) so a granted-but-unsaved device self-heals.
     if (Notification.permission === "granted") {
-      // Already granted but maybe not subscribed on this device — try silent subscribe
-      silentSubscribe();
+      ensureSubscribed();
       return;
     }
 
-    // Show the banner after a short delay
+    // permission === "default" → offer the banner (unless done / recently dismissed)
+    if (localStorage.getItem(PUSH_SUBSCRIBED_KEY) === "true") return;
+    const dismissed = localStorage.getItem(PUSH_DISMISSED_KEY);
+    if (dismissed && Date.now() - parseInt(dismissed) < DISMISS_DURATION_MS) return;
+
     const timer = setTimeout(() => setShowBanner(true), 3000);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-
-  const silentSubscribe = useCallback(async () => {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const existingSub = await registration.pushManager.getSubscription();
-      if (existingSub) {
-        // Already subscribed, just make sure server knows
-        await saveSubscription(existingSub);
-        localStorage.setItem(PUSH_SUBSCRIBED_KEY, "true");
-      }
-    } catch {}
-  }, [token, deviceId]);
 
   const saveSubscription = async (subscription: PushSubscription) => {
     const subJson = subscription.toJSON();
@@ -90,17 +106,9 @@ export default function PushManager({ phone, deviceId, token }: PushManagerProps
         return;
       }
 
-      // Convert VAPID key to Uint8Array
-      const urlBase64ToUint8Array = (base64String: string) => {
-        const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-        const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-        const rawData = window.atob(base64);
-        return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
-      };
-
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
       });
 
       await saveSubscription(subscription);
