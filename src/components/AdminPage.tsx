@@ -358,6 +358,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
   const { toast, show: showToast } = useToast();
   const isSuper = roleIsSuper(admin.role);
   const [tab, setTab] = useState<TabType>("orders");
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   /* ── Data ── */
   const [products, setProducts]         = useState<Product[]>([]);
@@ -1030,15 +1031,20 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
             )}
           </div>
 
-          <div style={{ marginLeft: "auto" }}>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <button onClick={loadData} style={{ height: 32, padding: "0 0.875rem", borderRadius: "0.625rem", background: "rgba(255, 255, 255, 0.8)", border: "1.5px solid rgba(16, 185, 129, 0.2)", color: "#059669", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
               ↻ Refresh
+            </button>
+            {/* Hamburger — mobile only */}
+            <button className="admin-hamburger" onClick={() => setMobileMoreOpen(true)}
+              style={{ display: "none", height: 32, width: 32, borderRadius: "0.625rem", background: "rgba(255,255,255,0.8)", border: "1.5px solid rgba(16,185,129,0.2)", color: "#059669", cursor: "pointer", alignItems: "center", justifyContent: "center", fontSize: "1.125rem", fontFamily: "inherit" }}>
+              ☰
             </button>
           </div>
         </header>
 
         {/* Metric cards */}
-        <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", padding: "1rem 1.5rem", display: "grid", gridTemplateColumns: `repeat(${isSuper ? 5 : 4}, minmax(0, 1fr))`, gap: "0.75rem" }} className="stats-grid">
+        <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", padding: "1rem 1.5rem", display: "grid", gridTemplateColumns: `repeat(${isSuper ? 5 : 4}, minmax(0, 1fr))`, gap: "0.75rem" }} className="stats-grid stats-grid-desktop">
           {[
             ...(isSuper ? [{ icon: "💰", label: "Revenue", value: `৳${totalRevBdt.toLocaleString()}`, sub: `$${totalRevUsdt} USDT`, color: "#059669", bg: "#f0fdf4", border: "#bbf7d0" }] : []),
             { icon: "🛒", label: "Orders", value: String(orders.length), sub: pendingCount > 0 ? `${pendingCount} pending` : "all up to date", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
@@ -1076,7 +1082,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                   </div>
 
                   {/* Status filters */}
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                  <div className="no-scrollbar" style={{ display: "flex", gap: "0.5rem", flexWrap: "nowrap", alignItems: "center", overflowX: "auto", paddingBottom: 2 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.8125rem", fontWeight: 700, color: "#64748b", cursor: "pointer" }}>
                       <input type="checkbox" checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0} onChange={toggleSelectAll} style={{ width: 15, height: 15 }} />
                       All
@@ -1129,9 +1135,12 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                               {/* Order code */}
                               <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "0.875rem", color: "#0f172a", flexShrink: 0, minWidth: 110 }}>{o.orderCode}</span>
 
-                              {/* Items */}
-                              <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {/* Items — full list desktop, count on mobile */}
+                              <span className="order-items-full" style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 {o.items.map((it) => `${it.nameEn} (${it.duration})`).join(", ")}
+                              </span>
+                              <span className="order-items-short" style={{ display: "none", fontSize: "0.8125rem", color: "#64748b", fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}>
+                                {o.items.length === 1 ? o.items[0].nameEn.slice(0, 18) + (o.items[0].nameEn.length > 18 ? "…" : "") : `${o.items.length} items`}
                               </span>
 
                               {/* Phone */}
@@ -1654,16 +1663,80 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
         </main>
       </div>
 
-      {/* ══ MOBILE BOTTOM NAV ══ */}
-      <nav className="admin-mobile-nav" style={{ display: "none", position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, background: "#0f172a", borderTop: "1px solid rgba(255,255,255,0.08)", padding: "0.5rem 0.25rem", justifyContent: "space-around" }}>
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", color: tab === t.key ? "#10b981" : "#475569", padding: "0.25rem 0.625rem", borderRadius: "0.5rem", position: "relative", minWidth: 48 }}>
-            <span style={{ fontSize: "1.25rem" }}>{t.icon}</span>
-            <span style={{ fontSize: "0.5625rem", fontWeight: 700, letterSpacing: "0.03em" }}>{t.label}</span>
-            {t.badge ? <span style={{ position: "absolute", top: 0, right: 2, background: "#ef4444", color: "#fff", fontSize: "0.5rem", fontWeight: 800, padding: "0.05rem 0.3rem", borderRadius: "9999px", minWidth: 14, textAlign: "center" }}>{t.badge}</span> : null}
-          </button>
-        ))}
-      </nav>
+      {/* ══ MOBILE BOTTOM NAV — 5 primary + More ══ */}
+      {(() => {
+        const PRIMARY: TabType[] = ["orders", "products", "credentials", "support"];
+        const NAV_LABEL: Partial<Record<TabType, string>> = { credentials: "Creds" };
+        const primaryTabs = tabs.filter((t) => PRIMARY.includes(t.key));
+        const moreTabs    = tabs.filter((t) => !PRIMARY.includes(t.key));
+        const moreActive  = moreTabs.some((t) => t.key === tab);
+
+        const navBtnStyle = (active: boolean): React.CSSProperties => ({
+          display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem",
+          background: "none", border: "none", cursor: "pointer", fontFamily: "inherit",
+          color: active ? "#10b981" : "#94a3b8",
+          padding: "0.375rem 0", flex: 1, position: "relative",
+        });
+
+        return (
+          <>
+            <nav className="admin-mobile-nav" style={{ display: "none", position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, background: "#fff", borderTop: "1px solid #e2e8f0", boxShadow: "0 -4px 20px rgba(0,0,0,0.06)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+              <div style={{ display: "flex", alignItems: "stretch", height: 58, width: "100%" }}>
+                {primaryTabs.map((t) => (
+                  <button key={t.key} onClick={() => { setTab(t.key); setMobileMoreOpen(false); }} style={navBtnStyle(tab === t.key)}>
+                    <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>{t.icon}</span>
+                    <span style={{ fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.02em" }}>{NAV_LABEL[t.key] || t.label}</span>
+                    {t.badge ? <span style={{ position: "absolute", top: 4, right: "calc(50% - 18px)", background: "#ef4444", color: "#fff", fontSize: "0.5rem", fontWeight: 800, padding: "0.05rem 0.3rem", borderRadius: "9999px", minWidth: 14, textAlign: "center" }}>{t.badge > 99 ? "99+" : t.badge}</span> : null}
+                    {tab === t.key && <span style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: 28, height: 3, background: "#10b981", borderRadius: "9999px 9999px 0 0" }} />}
+                  </button>
+                ))}
+                {/* More button */}
+                <button onClick={() => setMobileMoreOpen(true)} style={navBtnStyle(moreActive)}>
+                  <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>⋯</span>
+                  <span style={{ fontSize: "0.625rem", fontWeight: 700 }}>More</span>
+                  {moreTabs.some((t) => t.badge) && <span style={{ position: "absolute", top: 4, right: "calc(50% - 18px)", width: 8, height: 8, background: "#ef4444", borderRadius: "9999px" }} />}
+                  {moreActive && <span style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: 28, height: 3, background: "#10b981", borderRadius: "9999px 9999px 0 0" }} />}
+                </button>
+              </div>
+            </nav>
+
+            {/* ── More slide-up sheet ── */}
+            {mobileMoreOpen && (
+              <div className="admin-more-sheet" style={{ display: "none", position: "fixed", inset: 0, zIndex: 200 }}>
+                {/* Backdrop */}
+                <div onClick={() => setMobileMoreOpen(false)} style={{ position: "absolute", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(3px)" }} />
+                {/* Sheet */}
+                <div className="animate-fade-up" style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "#fff", borderRadius: "1.25rem 1.25rem 0 0", padding: "0.875rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px))", boxShadow: "0 -12px 40px rgba(0,0,0,0.12)" }}>
+                  {/* Handle */}
+                  <div style={{ width: 36, height: 4, background: "#e2e8f0", borderRadius: "9999px", margin: "0 auto 1rem" }} />
+                  {/* Admin info row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "1rem", padding: "0.625rem 0.5rem", background: "#f8fafc", borderRadius: "0.875rem", border: "1px solid #e2e8f0" }}>
+                    <div style={{ width: 34, height: 34, borderRadius: "9999px", background: "rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "#059669", fontSize: "0.9375rem", flexShrink: 0 }}>
+                      {admin.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "#0f172a", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{admin.name}</p>
+                      <p style={{ fontSize: "0.6875rem", color: "#059669", fontWeight: 700, margin: 0 }}>{ROLE_LABEL[admin.role] || "Staff"}</p>
+                    </div>
+                    <button onClick={onLogout} style={{ height: 30, padding: "0 0.75rem", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.18)", borderRadius: "0.5rem", color: "#b91c1c", fontSize: "0.6875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Logout</button>
+                  </div>
+                  {/* More tabs grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                    {moreTabs.map((t) => (
+                      <button key={t.key} onClick={() => { setTab(t.key); setMobileMoreOpen(false); }}
+                        style={{ display: "flex", alignItems: "center", gap: "0.625rem", padding: "0.75rem 0.875rem", borderRadius: "0.875rem", background: tab === t.key ? "rgba(16,185,129,0.08)" : "#f8fafc", border: `1px solid ${tab === t.key ? "rgba(16,185,129,0.25)" : "#e2e8f0"}`, cursor: "pointer", fontFamily: "inherit", position: "relative" }}>
+                        <span style={{ fontSize: "1.25rem", flexShrink: 0 }}>{t.icon}</span>
+                        <span style={{ fontWeight: 700, fontSize: "0.875rem", color: tab === t.key ? "#059669" : "#0f172a" }}>{t.label}</span>
+                        {t.badge ? <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", fontSize: "0.5625rem", fontWeight: 800, padding: "0.05rem 0.375rem", borderRadius: "9999px" }}>{t.badge}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Toast */}
       {toast && (
@@ -1932,43 +2005,42 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
         @media (max-width: 768px) {
           /* Layout */
           .admin-sidebar { display: none !important; }
-          .admin-main { margin-left: 0 !important; padding-bottom: 72px !important; }
-          .admin-mobile-nav { display: flex !important; overflow-x: auto; }
+          .admin-main { margin-left: 0 !important; padding-bottom: 68px !important; }
+          .admin-mobile-nav { display: flex !important; }
+          .admin-more-sheet { display: block !important; }
           .admin-chips { display: none !important; }
+          .admin-hamburger { display: flex !important; }
 
-          /* Stats */
+          /* Stats — horizontal scroll strip on mobile */
           .stats-grid {
-            grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+            display: flex !important;
+            flex-direction: row !important;
+            overflow-x: auto !important;
+            gap: 0.625rem !important;
             padding: 0.75rem 1rem !important;
-            gap: 0.5rem !important;
+            scroll-snap-type: x mandatory;
+          }
+          .stats-grid > div {
+            flex: 0 0 140px !important;
+            min-width: 140px !important;
+            scroll-snap-align: start;
           }
 
           /* Content padding */
-          main { padding: 0.875rem !important; }
+          main { padding: 0.75rem !important; }
 
-          /* Order rows — wrap on mobile */
-          .order-row {
-            flex-wrap: wrap !important;
-            padding: 0.75rem !important;
-            gap: 0.375rem !important;
-          }
-          /* Hide secondary cols, visible in expanded section */
+          /* Order rows on mobile */
+          .order-row { padding: 0.75rem !important; gap: 0.5rem !important; }
           .order-col-phone { display: none !important; }
           .order-col-time  { display: none !important; }
+          .order-items-full  { display: none !important; }
+          .order-items-short { display: inline !important; }
 
-          /* Inputs full-width in toolbars */
+          /* Inputs full-width */
           .admin-main input[type="text"],
           .admin-main input[type="search"] {
             min-width: unset !important;
-            width: 100% !important;
           }
-        }
-
-        /* ── Small mobile (480px) ── */
-        @media (max-width: 480px) {
-          .stats-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
-          .admin-mobile-nav button { min-width: 40px !important; padding: 0.2rem 0.375rem !important; }
-          .admin-mobile-nav span[style] { font-size: 0.5rem !important; }
         }
       `}</style>
     </div>
