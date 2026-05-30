@@ -339,7 +339,7 @@ async function copyToClipboard(text: string) {
 /* ─────────────────────────────────────────
    ADMIN DASHBOARD
 ───────────────────────────────────────── */
-type TabType = "orders" | "products" | "analytics" | "credentials" | "reviews" | "support" | "staff" | "links" | "settings" | "guides";
+type TabType = "orders" | "products" | "analytics" | "credentials" | "customers" | "reviews" | "support" | "staff" | "links" | "settings" | "guides";
 
 /** Super User has full control; legacy "admin" role is treated as Super User. */
 function roleIsSuper(role: string): boolean {
@@ -939,6 +939,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
     { key: "products",    label: "Products",    icon: "📦", badge: lowStockProducts.length || undefined },
     ...(isSuper ? [{ key: "analytics" as TabType, label: "Analytics", icon: "📊" }] : []),
     { key: "credentials", label: "Credentials", icon: "🔑", badge: urgentCreds || undefined },
+    { key: "customers" as TabType, label: "Customers", icon: "🧑" },
     { key: "reviews",    label: "Reviews",     icon: "⭐" },
     { key: "support",    label: "Support",     icon: "📩", badge: unresolvedCount || undefined },
     ...(isSuper ? [{ key: "staff" as TabType, label: "Staff", icon: "👥" }] : []),
@@ -1644,6 +1645,11 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                 </div>
               )}
 
+              {/* ══ CUSTOMERS TAB ══ */}
+              {tab === "customers" && (
+                <CustomersTab adminFetch={adminFetch} showToast={showToast} />
+              )}
+
               {/* ══ LINKS TAB ══ */}
               {tab === "links" && (
                 <LinksTab products={products} adminFetch={adminFetch} showToast={showToast} />
@@ -2043,6 +2049,160 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   CUSTOMERS TAB
+───────────────────────────────────────── */
+interface CustomerCred { id: number; productName: string; duration: string; expiryDate: string; isReclaimed: boolean; }
+interface Customer { phone: string; orderCount: number; totalSpent: number; firstSeen: string; lastOrder: string; hasPush: boolean; credentials: CustomerCred[]; }
+
+function custCredStatus(c: CustomerCred): { key: "reclaimed" | "expired" | "expiring" | "active"; label: string; color: string; bg: string; border: string } {
+  if (c.isReclaimed) return { key: "reclaimed", label: "Reclaimed", color: "#64748b", bg: "#f1f5f9", border: "#e2e8f0" };
+  const diff = new Date(c.expiryDate).getTime() - Date.now();
+  const days = Math.floor(diff / 86400000);
+  if (diff < 0) return { key: "expired", label: `Expired ${Math.abs(days)}d ago`, color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" };
+  if (diff < 7 * 86400000) return { key: "expiring", label: days === 0 ? "Expires today!" : `${days}d left`, color: "#b45309", bg: "#fffbeb", border: "#fde68a" };
+  return { key: "active", label: `${days}d left`, color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" };
+}
+
+function CustomersTab({ adminFetch, showToast }: {
+  adminFetch: (url: string, opts?: RequestInit) => Promise<Response>;
+  showToast: (msg: string, type?: "success" | "error" | "warn") => void;
+}) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loaded, setLoaded]   = useState(false);
+  const [search, setSearch]   = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [reminding, setReminding] = useState<number | null>(null);
+
+  const load = () => {
+    adminFetch("/api/customers").then((r) => r.json()).then((d) => { setCustomers(d.customers || []); setLoaded(true); }).catch(() => setLoaded(true));
+  };
+  useEffect(() => { load(); }, []);
+
+  const sendReminder = async (cust: Customer, cred?: CustomerCred) => {
+    if (!cust.hasPush) { showToast("Customer has no notifications enabled", "warn"); return; }
+    setReminding(cred?.id ?? -1);
+    try {
+      const res = await adminFetch("/api/customers/remind", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: cust.phone, productName: cred?.productName || "" }) });
+      const data = await res.json();
+      if (res.ok) showToast(`Reminder sent to ${cust.phone} ✓`);
+      else showToast(data.error || "Failed to send", "error");
+    } catch { showToast("Failed to send reminder", "error"); }
+    setReminding(null);
+  };
+
+  const filtered = customers.filter((c) => !search || c.phone.includes(search.trim()));
+
+  if (!loaded) return <div style={{ padding: "3rem", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}>Loading customers…</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+      <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by phone number..." style={{ ...INP, flex: 1, minWidth: 200 }} />
+        <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#64748b", whiteSpace: "nowrap" }}>{filtered.length} customer{filtered.length !== 1 ? "s" : ""}</span>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "3rem 0", color: "#94a3b8" }}>
+          <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>👥</div>
+          <p style={{ fontWeight: 700, color: "#64748b" }}>No customers found</p>
+          <p style={{ fontSize: "0.8125rem" }}>Customers appear after their first order</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          {filtered.map((c) => {
+            const isOpen = expanded === c.phone;
+            const active = c.credentials.filter((cr) => !cr.isReclaimed && new Date(cr.expiryDate).getTime() > Date.now());
+            const expiringSoon = active.filter((cr) => new Date(cr.expiryDate).getTime() - Date.now() < 7 * 86400000).length;
+            const past = c.credentials.filter((cr) => cr.isReclaimed || new Date(cr.expiryDate).getTime() <= Date.now());
+            return (
+              <div key={c.phone} style={{ background: "#fff", border: "1px solid #e8edf3", borderRadius: "0.875rem", overflow: "hidden" }}>
+                {/* Header row */}
+                <div onClick={() => setExpanded(isOpen ? null : c.phone)} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.875rem 1.125rem", cursor: "pointer", flexWrap: "wrap" }}>
+                  <div style={{ width: 38, height: 38, borderRadius: "9999px", background: "rgba(16,185,129,0.1)", border: "1.5px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.0625rem", flexShrink: 0 }}>👤</div>
+                  <div style={{ flex: 1, minWidth: 120 }}>
+                    <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#0f172a", margin: 0, fontFamily: "monospace" }}>📱 {c.phone}</p>
+                    <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, margin: "0.15rem 0 0" }}>{c.orderCount} order{c.orderCount !== 1 ? "s" : ""} · ৳{c.totalSpent.toLocaleString()} spent</p>
+                  </div>
+                  {c.hasPush ? (
+                    <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#059669", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.2rem 0.5rem", borderRadius: "9999px", flexShrink: 0 }}>🔔 ON</span>
+                  ) : (
+                    <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#94a3b8", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "0.2rem 0.5rem", borderRadius: "9999px", flexShrink: 0 }}>🔕 OFF</span>
+                  )}
+                  {expiringSoon > 0 && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", padding: "0.2rem 0.5rem", borderRadius: "9999px", flexShrink: 0 }}>⚠️ {expiringSoon} expiring</span>}
+                  <span style={{ color: "#94a3b8", fontSize: "0.75rem", flexShrink: 0, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>▾</span>
+                </div>
+
+                {/* Expanded */}
+                {isOpen && (
+                  <div style={{ borderTop: "1px solid #f1f5f9", padding: "1.125rem", background: "#fafbfc" }}>
+                    {/* Active credentials */}
+                    {active.length > 0 && (
+                      <div style={{ marginBottom: past.length > 0 ? "1rem" : 0 }}>
+                        <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>Active Credentials</p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                          {active.map((cr) => {
+                            const st = custCredStatus(cr);
+                            return (
+                              <div key={cr.id} style={{ display: "flex", alignItems: "center", gap: "0.625rem", background: "#fff", borderRadius: "0.625rem", padding: "0.5rem 0.75rem", border: "1px solid #e8edf3", flexWrap: "wrap" }}>
+                                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#0f172a", flex: 1, minWidth: 120 }}>{cr.productName} <span style={{ color: "#94a3b8", fontWeight: 600 }}>· {cr.duration}</span></span>
+                                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: st.color, background: st.bg, border: `1px solid ${st.border}`, padding: "0.15rem 0.5rem", borderRadius: "9999px", flexShrink: 0 }}>{st.label}</span>
+                                {st.key === "expiring" && (
+                                  <button disabled={reminding === cr.id || !c.hasPush} onClick={() => sendReminder(c, cr)}
+                                    style={{ ...BTN("green"), height: 28, fontSize: "0.6875rem", opacity: !c.hasPush ? 0.5 : 1, cursor: !c.hasPush ? "not-allowed" : "pointer" }}>
+                                    {reminding === cr.id ? "…" : "🔔 Remind"}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Past credentials */}
+                    {past.length > 0 && (
+                      <div>
+                        <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>Past Credentials</p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                          {past.map((cr) => {
+                            const st = custCredStatus(cr);
+                            return (
+                              <div key={cr.id} style={{ display: "flex", alignItems: "center", gap: "0.625rem", background: "#fff", borderRadius: "0.625rem", padding: "0.5rem 0.75rem", border: "1px solid #f1f5f9", opacity: 0.85, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#64748b", flex: 1, minWidth: 120 }}>{cr.productName} <span style={{ color: "#94a3b8", fontWeight: 600 }}>· {cr.duration}</span></span>
+                                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: st.color, background: st.bg, border: `1px solid ${st.border}`, padding: "0.15rem 0.5rem", borderRadius: "9999px", flexShrink: 0 }}>{st.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {c.credentials.length === 0 && (
+                      <p style={{ fontSize: "0.8125rem", color: "#94a3b8", fontWeight: 600, textAlign: "center", padding: "0.5rem 0" }}>No credentials delivered yet</p>
+                    )}
+
+                    {/* Footer actions */}
+                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", flexWrap: "wrap" }}>
+                      <button disabled={reminding === -1 || !c.hasPush} onClick={() => sendReminder(c)}
+                        style={{ ...BTN("green"), height: 34, opacity: !c.hasPush ? 0.5 : 1, cursor: !c.hasPush ? "not-allowed" : "pointer" }}>
+                        {reminding === -1 ? "Sending…" : "🔔 Send Renewal Reminder"}
+                      </button>
+                      <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 600, alignSelf: "center" }}>
+                        Customer since {new Date(c.firstSeen).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
