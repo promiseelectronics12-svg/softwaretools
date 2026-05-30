@@ -7,7 +7,7 @@ import {
   phoneDeviceBindings,
   orders,
 } from "@/lib/db/schema";
-import { eq, and, lt, inArray } from "drizzle-orm";
+import { eq, and, lt, inArray, sql } from "drizzle-orm";
 
 const lookupLimiter = new Map<string, { count: number; resetAt: number }>();
 function isLookupRateLimited(ip: string): boolean {
@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const phone       = (body.phone       ?? "").toString().trim();
-  const transactionId = (body.transactionId ?? "").toString().trim().toUpperCase();
+  const rawTransactionId = (body.transactionId ?? "").toString().trim();
+  const transactionId = rawTransactionId.toUpperCase();
   const deviceId    = (body.deviceId    ?? "").toString().trim();
 
   if (!phone || !deviceId) {
@@ -140,11 +141,13 @@ export async function POST(req: NextRequest) {
     ...credOrderCodes.map((c) => c.orderCode.toUpperCase()),
   ]);
 
-  // Also allow trxId match
+  // Also allow trxId match — case-insensitive, since trxIds are stored as the
+  // customer typed them at checkout (may contain lowercase) but the lookup
+  // input is uppercased for orderCode matching.
   const trxMatch = await db
     .select({ id: orders.id })
     .from(orders)
-    .where(and(eq(orders.phone, phone), eq(orders.trxId, transactionId)))
+    .where(and(eq(orders.phone, phone), sql`lower(${orders.trxId}) = ${rawTransactionId.toLowerCase()}`))
     .limit(1);
 
   const isValid =
