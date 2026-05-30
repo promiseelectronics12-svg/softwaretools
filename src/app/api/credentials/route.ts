@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { deliveryCredentials } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { getAdminSession } from "@/lib/admin-auth";
+import { sendPushToPhone } from "@/lib/push";
 
 /** GET /api/credentials — Admin only. Returns all credentials sorted by expiry date ASC */
 export async function GET() {
@@ -51,6 +52,13 @@ export async function POST(req: NextRequest) {
       isReclaimed: false,
     })
     .returning();
+
+  // Notify customer their credentials are ready (fire-and-forget)
+  sendPushToPhone(phone, {
+    title: "✅ Your Subscription is Ready!",
+    body: `Your ${productName} credentials have been delivered. Tap to view.`,
+    url: "/lookup",
+  }).catch(() => {});
 
   return NextResponse.json({ credential: cred }, { status: 201 });
 }

@@ -13,15 +13,16 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState("bkash");
   const [trxId, setTrxId] = useState("");
-  const [phone, setPhone] = useState("");
+  const [digits, setDigits] = useState("");
   const [note, setNote] = useState("");
+  const [pastingTrx, setPastingTrx] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const phoneTrimmed = phone.trim();
-    if (!phoneTrimmed) { setError("Phone number is required"); return; }
+    const phoneTrimmed = "0" + digits.trim();
+    if (digits.trim().length < 10) { setError("Phone number is required"); return; }
     if (!/^01[3-9]\d{8}$/.test(phoneTrimmed)) { setError("Enter a valid Bangladeshi phone number (e.g. 01XXXXXXXXX)"); return; }
     if (!trxId.trim()) { setError("Transaction ID is required"); return; }
     if (trxId.trim().length < 6) { setError("Transaction ID looks too short — please double-check"); return; }
@@ -141,13 +142,59 @@ export default function CheckoutPage() {
             <label style={{ display: "block", fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
               {t.phoneNumber} <span style={{ color: "#dc2626" }}>*</span>
             </label>
-            <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" className="input" />
+            <div style={{ display: "flex", alignItems: "center", border: "1.5px solid #e2e8f0", borderRadius: "0.875rem", overflow: "hidden", background: "#fff", height: 50 }}>
+              <div style={{ padding: "0 0.875rem 0 1rem", fontSize: "1rem", fontWeight: 700, color: "#10b981", borderRight: "1.5px solid #e2e8f0", height: "100%", display: "flex", alignItems: "center", background: "#f8fdf9", userSelect: "none", flexShrink: 0 }}>
+                0
+              </div>
+              <input
+                type="tel"
+                required
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="1XXXXXXXXX"
+                value={digits}
+                onChange={(e) => {
+                  let val = e.target.value.replace(/\D/g, "");
+                  if (val.startsWith("0")) val = val.replace(/^0+/, "");
+                  if (val.length > 10) val = val.slice(0, 10);
+                  setDigits(val);
+                }}
+                style={{ flex: 1, height: "100%", padding: "0 1rem", border: "none", outline: "none", fontSize: "1rem", fontFamily: "inherit", color: "#0f172a", background: "transparent", letterSpacing: "0.05em" }}
+              />
+              <div style={{ padding: "0 0.875rem", fontSize: "0.6875rem", fontWeight: 700, color: digits.length === 10 ? "#10b981" : "#cbd5e1", flexShrink: 0 }}>
+                {digits.length}/10
+              </div>
+            </div>
           </div>
           <div>
             <label style={{ display: "block", fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
               {t.enterTrxId} <span style={{ color: "#dc2626" }}>*</span>
             </label>
-            <input type="text" required value={trxId} onChange={(e) => setTrxId(e.target.value)} placeholder="e.g. 9A3B7C2D4E5F" className="input" />
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "stretch" }}>
+              <input
+                type="text"
+                required
+                value={trxId}
+                onChange={(e) => setTrxId(e.target.value)}
+                placeholder="e.g. 9A3B7C2D4E5F"
+                className="input"
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setPastingTrx(true);
+                    const text = await navigator.clipboard.readText();
+                    setTrxId(text.trim());
+                  } catch {}
+                  setPastingTrx(false);
+                }}
+                style={{ height: 50, padding: "0 1rem", borderRadius: "0.875rem", background: "#f8faf9", border: "1.5px solid #e2e8f0", color: "#64748b", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, whiteSpace: "nowrap" }}
+              >
+                {pastingTrx ? "..." : "📋 Paste"}
+              </button>
+            </div>
           </div>
           <div>
             <label style={{ display: "block", fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>

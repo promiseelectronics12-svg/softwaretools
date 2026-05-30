@@ -2,6 +2,23 @@
 
 import { useEffect, useState, useCallback } from "react";
 
+function playNotificationBeep() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.6);
+  } catch {}
+}
+
 const PUSH_DISMISSED_KEY = "dizi_push_dismissed";
 const PUSH_SUBSCRIBED_KEY = "dizi_push_subscribed";
 const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -25,6 +42,16 @@ interface PushManagerProps {
 export default function PushManager({ phone, deviceId, token }: PushManagerProps) {
   const [showBanner, setShowBanner] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+
+  // Listen for push events from service worker → play beep (app open / foreground)
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "PLAY_NOTIFICATION_SOUND") playNotificationBeep();
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, []);
 
   // Ensure a push subscription exists on this device AND is saved server-side.
   // Creates one if missing (permission already granted). Idempotent upsert, so

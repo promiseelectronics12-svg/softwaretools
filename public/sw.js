@@ -42,7 +42,7 @@ self.addEventListener("fetch", (event) => {
 
 // Push: receive notification from server
 self.addEventListener("push", (event) => {
-  let data = { title: "Official Tool Store", body: "You have a new update!", url: "/lookup" };
+  let data = { title: "📦 Official Tool Store", body: "Your subscription update is ready. Tap to view.", url: "/lookup" };
 
   try {
     if (event.data) {
@@ -56,13 +56,23 @@ self.addEventListener("push", (event) => {
     badge: "/icons/android-chrome-192x192.png",
     vibrate: [120, 60, 120, 60, 280],
     data: { url: data.url || "/lookup" },
+    tag: "ots-notification",
+    renotify: true,
     actions: [
       { action: "open", title: "View Now" },
       { action: "dismiss", title: "Dismiss" },
     ],
   };
 
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(data.title, options),
+      // Message open clients to play sound (foreground/app-open case)
+      self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then((clients) => {
+        clients.forEach((c) => c.postMessage({ type: "PLAY_NOTIFICATION_SOUND" }));
+      }),
+    ])
+  );
 });
 
 // Notification click: open the app

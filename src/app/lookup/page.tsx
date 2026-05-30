@@ -71,83 +71,114 @@ async function copyText(text: string, setCopied: (v: boolean) => void) {
 
 /* ─── TOTP Widget ─── */
 function TOTPWidget({ token, credId }: { token: string; credId: number }) {
-  const [state, setState]   = useState<TOTPState | null>(null);
-  const [error, setError]   = useState("");
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [state, setState]     = useState<TOTPState | null>(null);
+  const [localSecs, setLocalSecs] = useState<number | null>(null);
+  const [error, setError]     = useState("");
+  const [copied, setCopied]   = useState(false);
 
   const fetchCode = useCallback(async () => {
     try {
       const res = await fetch(`/api/lookup/totp?token=${token}&credId=${credId}`);
       if (!res.ok) { setError("Could not load code"); return; }
-      const data = await res.json();
+      const data: TOTPState = await res.json();
       setState(data);
+      setLocalSecs(data.secondsRemaining);
       setError("");
     } catch { setError("Network error"); }
   }, [token, credId]);
 
+  // Initial load
+  useEffect(() => { fetchCode(); }, [fetchCode]);
+
+  // Smooth 1s local countdown — re-fetches when it hits 0
   useEffect(() => {
-    fetchCode();
-    intervalRef.current = setInterval(fetchCode, 5000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchCode]);
+    if (localSecs === null) return;
+    if (localSecs <= 0) { fetchCode(); return; }
+    const t = setTimeout(() => setLocalSecs((s) => (s !== null ? s - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [localSecs, fetchCode]);
 
   if (error) return null;
-  if (!state) return (
+  if (!state || localSecs === null) return (
     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "1rem" }}>
       <div style={{ width: 16, height: 16, borderRadius: "9999px", border: "2px solid #e2e8f0", borderTopColor: "#10b981", animation: "spin 0.7s linear infinite" }} />
-      <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Loading authenticator code...</span>
+      <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Loading authenticator...</span>
     </div>
   );
 
-  const progress = ((30 - state.secondsRemaining) / 30) * 100;
-  const isUrgent = state.secondsRemaining <= 5;
+  const secs = localSecs;
+  const isUrgent = secs <= 5;
+  const accentColor = isUrgent ? "#ef4444" : "#10b981";
+  const r = 22;
+  const circ = 2 * Math.PI * r; // ≈ 138.2
+  const dashOffset = circ * (1 - secs / 30); // 0 = full ring, circ = empty
 
   return (
-    <div style={{ marginTop: "1.25rem", padding: "1rem", background: "rgba(16,185,129,0.04)", border: "1.5px solid rgba(16,185,129,0.15)", borderRadius: "1rem" }}>
-      <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#059669", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.75rem" }}>
-        🔐 Authenticator Code
-      </p>
+    <div style={{ marginTop: "1.25rem", padding: "1.25rem 1.25rem 1rem", background: "#f8fdf9", border: `1.5px solid ${isUrgent ? "rgba(239,68,68,0.2)" : "rgba(16,185,129,0.2)"}`, borderRadius: "1.25rem", transition: "border-color 0.3s" }}>
 
-      {/* Big spaced code */}
-      <div style={{ display: "flex", gap: "0.375rem", justifyContent: "center", marginBottom: "0.875rem" }}>
-        {state.code.split("").map((digit, i) => (
-          <div
-            key={i}
-            style={{
-              width: 38, height: 48,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: "#fff",
-              border: `2px solid ${isUrgent ? "#ef4444" : "#10b981"}`,
-              borderRadius: "0.625rem",
-              fontSize: "1.375rem", fontWeight: 800,
-              color: isUrgent ? "#ef4444" : "#0f172a",
-              fontFamily: "monospace",
-              transition: "border-color 0.3s, color 0.3s",
-              ...(i === 2 ? { marginRight: "0.5rem" } : {}),
-            }}
-          >
-            {digit}
+      {/* Header row */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.125rem" }}>
+        <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#059669", textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>
+          🔐 Authenticator Code
+        </p>
+        <button
+          onClick={() => { navigator.clipboard.writeText(state.code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+          style={{ height: 28, padding: "0 0.75rem", borderRadius: "0.5rem", background: copied ? "#f0fdf4" : "#fff", border: `1px solid ${copied ? "#bbf7d0" : "#e2e8f0"}`, color: copied ? "#15803d" : "#64748b", fontSize: "0.6875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          {copied ? "✓ Copied" : "Copy"}
+        </button>
+      </div>
+
+      {/* Digit display + ring timer side-by-side */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+
+        {/* 3 + 3 digit groups */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: "0.25rem" }}>
+            {state.code.slice(0, 3).split("").map((d, i) => (
+              <span key={i} style={{ fontSize: "2.25rem", fontWeight: 800, fontFamily: "'Courier New', Courier, monospace", color: isUrgent ? "#ef4444" : "#0f172a", lineHeight: 1, letterSpacing: "-0.02em", transition: "color 0.3s" }}>
+                {d}
+              </span>
+            ))}
           </div>
-        ))}
+          <span style={{ fontSize: "1.75rem", color: "#cbd5e1", fontWeight: 300, lineHeight: 1, marginBottom: "0.1rem" }}>·</span>
+          <div style={{ display: "flex", gap: "0.25rem" }}>
+            {state.code.slice(3, 6).split("").map((d, i) => (
+              <span key={i} style={{ fontSize: "2.25rem", fontWeight: 800, fontFamily: "'Courier New', Courier, monospace", color: isUrgent ? "#ef4444" : "#0f172a", lineHeight: 1, letterSpacing: "-0.02em", transition: "color 0.3s" }}>
+                {d}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* SVG circular countdown ring */}
+        <svg width="56" height="56" viewBox="0 0 56 56" style={{ flexShrink: 0 }}>
+          {/* Track */}
+          <circle cx="28" cy="28" r={r} fill="none" stroke="#e2e8f0" strokeWidth="3.5" />
+          {/* Progress arc — drains clockwise as secs decrease */}
+          <circle
+            cx="28" cy="28" r={r}
+            fill="none"
+            stroke={accentColor}
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            strokeDashoffset={dashOffset}
+            transform="rotate(-90 28 28)"
+            style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s" }}
+          />
+          {/* Seconds label */}
+          <text x="28" y="28" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="700" fill={isUrgent ? "#ef4444" : "#64748b"} fontFamily="inherit" style={{ transition: "fill 0.3s" }}>
+            {secs}s
+          </text>
+        </svg>
       </div>
 
-      {/* Countdown bar */}
-      <div style={{ height: 6, background: "#e2e8f0", borderRadius: "9999px", overflow: "hidden", marginBottom: "0.5rem" }}>
-        <div
-          style={{
-            height: "100%",
-            width: `${100 - progress}%`,
-            background: isUrgent
-              ? "linear-gradient(90deg,#ef4444,#f87171)"
-              : "linear-gradient(90deg,#10b981,#34d399)",
-            borderRadius: "9999px",
-            transition: "width 1s linear, background 0.3s",
-          }}
-        />
-      </div>
-      <p style={{ fontSize: "0.6875rem", color: isUrgent ? "#ef4444" : "#94a3b8", fontWeight: 700, textAlign: "right" }}>
-        {isUrgent ? "⚠️ " : ""}{state.secondsRemaining}s remaining
-      </p>
+      {isUrgent && (
+        <p style={{ textAlign: "center", fontSize: "0.6875rem", color: "#ef4444", fontWeight: 700, marginTop: "0.875rem" }}>
+          ⚠️ Code expiring — wait for next code before using
+        </p>
+      )}
     </div>
   );
 }
@@ -334,6 +365,7 @@ export default function LookupPage() {
   const [phone, setPhone]               = useState("");             // full verified phone (01XXXXXXXXX)
   const [digits, setDigits]             = useState("");             // 10 user-typed digits (after the leading 0)
   const [transactionId, setTransactionId] = useState("");
+  const [pastingTrx, setPastingTrx] = useState(false);
   const [token, setToken]               = useState("");
   const [credentials, setCredentials]  = useState<Credential[]>([]);
   const [loadingCreds, setLoadingCreds] = useState(false);
@@ -600,17 +632,33 @@ export default function LookupPage() {
                 <label style={{ display: "block", fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: "0.5rem" }}>
                   Transaction ID
                 </label>
-                <input
-                  id="transaction-id"
-                  type="text"
-                  required
-                  placeholder="e.g. ORD-1234 or 8TG6XXXX"
-                  value={transactionId}
-                  onChange={(e) => setTransactionId(e.target.value)}
-                  style={{ ...inputBase, border: `1.5px solid ${txError ? "#ef4444" : "#e2e8f0"}` }}
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                />
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "stretch" }}>
+                  <input
+                    id="transaction-id"
+                    type="text"
+                    required
+                    placeholder="e.g. ORD-1234 or 8TG6XXXX"
+                    value={transactionId}
+                    onChange={(e) => setTransactionId(e.target.value)}
+                    style={{ ...inputBase, flex: 1, border: `1.5px solid ${txError ? "#ef4444" : "#e2e8f0"}` }}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        setPastingTrx(true);
+                        const text = await navigator.clipboard.readText();
+                        setTransactionId(text.trim());
+                      } catch {}
+                      setPastingTrx(false);
+                    }}
+                    style={{ height: 50, padding: "0 1rem", borderRadius: "0.875rem", background: "#f8faf9", border: "1.5px solid #e2e8f0", color: "#64748b", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, whiteSpace: "nowrap" }}
+                  >
+                    {pastingTrx ? "..." : "📋 Paste"}
+                  </button>
+                </div>
                 {txError && <p style={{ color: "#ef4444", fontSize: "0.8125rem", fontWeight: 600, marginTop: "0.375rem" }}>⚠️ {txError}</p>}
               </div>
 
