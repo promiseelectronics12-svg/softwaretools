@@ -427,6 +427,8 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
   const pollingRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const chartRef      = useRef<HTMLCanvasElement | null>(null);
   const chartInstance = useRef<Chart | null>(null);
+  const stockChartRef      = useRef<HTMLCanvasElement | null>(null);
+  const stockChartInstance = useRef<Chart | null>(null);
   // Highest IDs already seen — used to detect genuinely new orders/messages
   // when polling, so we notify once (and dedupe against SSE pushes).
   const lastOrderId   = useRef<number>(0);
@@ -587,6 +589,52 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
     });
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
   }, [tab, orders]);
+
+  /* ── Stock alert chart ── */
+  useEffect(() => {
+    if (tab !== "analytics" || !stockChartRef.current || products.length === 0) return;
+    if (stockChartInstance.current) stockChartInstance.current.destroy();
+    const sorted = [...products].sort((a, b) => a.stock - b.stock).slice(0, 15);
+    const colors = sorted.map((p) =>
+      p.stock < 5  ? "rgba(239,68,68,0.75)"  :
+      p.stock < 10 ? "rgba(245,158,11,0.75)" :
+      p.stock < 20 ? "rgba(251,191,36,0.5)"  :
+                     "rgba(16,185,129,0.45)"
+    );
+    const borders = sorted.map((p) =>
+      p.stock < 5  ? "#ef4444" :
+      p.stock < 10 ? "#f59e0b" :
+      p.stock < 20 ? "#fbbf24" :
+                     "#10b981"
+    );
+    stockChartInstance.current = new Chart(stockChartRef.current, {
+      type: "bar",
+      data: {
+        labels: sorted.map((p) => p.nameEn.length > 22 ? p.nameEn.slice(0, 20) + "…" : p.nameEn),
+        datasets: [{
+          label: "Stock",
+          data: sorted.map((p) => p.stock),
+          backgroundColor: colors,
+          borderColor: borders,
+          borderWidth: 1.5,
+          borderRadius: 6,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => ` Stock: ${ctx.parsed.x}` } },
+        },
+        scales: {
+          x: { beginAtZero: true, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { color: "#94a3b8", stepSize: 5 } },
+          y: { grid: { display: false }, ticks: { color: "#475569", font: { size: 11, weight: 600 } } },
+        },
+      },
+    });
+    return () => { if (stockChartInstance.current) stockChartInstance.current.destroy(); };
+  }, [tab, products]);
 
   /* ── Derived ── */
   const deliveredOrderCodes = new Set(credentials.map((c) => c.orderCode));
@@ -1252,7 +1300,11 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                     const isLow = p.stock < 10;
                     return (
                       <div key={p.id} style={{ background: "#fff", border: `1.5px solid ${isLow ? "#fde68a" : "#e8edf3"}`, borderRadius: "1.125rem", padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "0.875rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", flexWrap: "wrap" }}>
-                        <div style={{ width: 44, height: 44, borderRadius: "0.875rem", background: p.iconBg || "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem", flexShrink: 0, border: "1px solid rgba(0,0,0,0.06)" }}>{p.icon || "📦"}</div>
+                        {p.image ? (
+                          <img src={p.image} alt={p.nameEn} style={{ width: 44, height: 44, borderRadius: "0.875rem", objectFit: "cover", flexShrink: 0, border: "1px solid rgba(0,0,0,0.08)" }} onError={(e) => { (e.currentTarget as HTMLImageElement).replaceWith(Object.assign(document.createElement("div"), { textContent: p.icon || "📦", style: `width:44px;height:44px;border-radius:.875rem;background:${p.iconBg||"#e8f5e9"};display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;border:1px solid rgba(0,0,0,.06)` })); }} />
+                        ) : (
+                          <div style={{ width: 44, height: 44, borderRadius: "0.875rem", background: p.iconBg || "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem", flexShrink: 0, border: "1px solid rgba(0,0,0,0.06)" }}>{p.icon || "📦"}</div>
+                        )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nameEn}</p>
                           <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, marginTop: "0.2rem" }}>{p.category} · Sold: {p.sold}</p>
@@ -1294,6 +1346,21 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                     <h3 style={{ fontWeight: 700, fontSize: "0.875rem", color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "1.25rem" }}>Revenue — Last 7 Days (BDT)</h3>
                     <canvas ref={chartRef} style={{ maxHeight: 280 }} />
                   </div>
+                  {/* Stock Alert Chart */}
+                  <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: "1.25rem", padding: "1.5rem", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <h3 style={{ fontWeight: 700, fontSize: "0.875rem", color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Stock Alert — Bottom 15 Products</h3>
+                      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                        {[{ color: "#ef4444", label: "Critical (<5)" }, { color: "#f59e0b", label: "Low (<10)" }, { color: "#fbbf24", label: "Watch (<20)" }, { color: "#10b981", label: "OK (20+)" }].map((l) => (
+                          <span key={l.label} style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.6875rem", fontWeight: 700, color: "#64748b" }}>
+                            <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color, display: "inline-block" }} />{l.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <canvas ref={stockChartRef} style={{ maxHeight: 340 }} />
+                  </div>
+
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,220px),1fr))", gap: "1rem" }}>
                     <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: "1.25rem", padding: "1.25rem" }}>
                       <h3 style={{ fontWeight: 700, fontSize: "0.875rem", color: "#0f172a", marginBottom: "1rem" }}>Order Status</h3>
