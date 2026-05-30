@@ -72,8 +72,10 @@ export default function CartPage() {
                   padding: "1rem",
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.875rem",
+                  gap: "0.75rem",
                   animationDelay: `${i * 60}ms`,
+                  overflow: "hidden",
+                  minWidth: 0,
                 }}
               >
                 {/* Product image / icon */}
@@ -114,7 +116,7 @@ export default function CartPage() {
                   </div>
                 )}
 
-                {/* Details */}
+                {/* Details + price in one column so row never overflows */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p
                     style={{
@@ -141,13 +143,11 @@ export default function CartPage() {
                   >
                     {item.duration}
                   </p>
-                </div>
-
-                {/* Price */}
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <p style={{ fontWeight: 800, fontSize: "1.0625rem", color: "#0f172a" }}>৳{item.priceBdt}</p>
-                  <p style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 700, marginTop: "0.15rem" }}>
-                    {item.priceUsdt} USDT
+                  <p style={{ fontWeight: 800, fontSize: "1rem", color: "#0f172a", marginTop: "0.3rem" }}>
+                    ৳{item.priceBdt}
+                    <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 700, marginLeft: "0.35rem" }}>
+                      {item.priceUsdt} USDT
+                    </span>
                   </p>
                 </div>
 
@@ -156,10 +156,10 @@ export default function CartPage() {
                   onClick={() => removeFromCart(item.id)}
                   title="Remove from cart"
                   style={{
-                    minWidth: 44,
-                    minHeight: 44,
-                    padding: "0.5rem",
-                    borderRadius: "0.875rem",
+                    width: 40,
+                    height: 40,
+                    padding: "0.375rem",
+                    borderRadius: "0.75rem",
                     background: "#f8faf9",
                     border: "1.5px solid #e2e8f0",
                     display: "flex",
@@ -168,7 +168,7 @@ export default function CartPage() {
                     color: "#dc2626",
                     cursor: "pointer",
                     flexShrink: 0,
-                    fontSize: "1.125rem",
+                    fontSize: "1rem",
                     transition: "all 0.15s ease",
                     fontFamily: "inherit",
                     fontWeight: 600,
