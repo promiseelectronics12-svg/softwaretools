@@ -339,7 +339,7 @@ async function copyToClipboard(text: string) {
 /* ─────────────────────────────────────────
    ADMIN DASHBOARD
 ───────────────────────────────────────── */
-type TabType = "orders" | "products" | "analytics" | "credentials" | "customers" | "reviews" | "support" | "staff" | "links" | "settings" | "guides";
+type TabType = "orders" | "products" | "analytics" | "credentials" | "customers" | "reviews" | "support" | "staff" | "links" | "settings" | "guides" | "testing";
 
 /** Super User has full control; legacy "admin" role is treated as Super User. */
 function roleIsSuper(role: string): boolean {
@@ -946,6 +946,8 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
     { key: "links" as TabType, label: "Links", icon: "🔗" },
     ...(isSuper ? [{ key: "settings" as TabType, label: "Settings", icon: "⚙️" }] : []),
     { key: "guides" as TabType, label: "Guides", icon: "📖" },
+    /* PILOT TEST — remove this line when test feature is no longer needed */
+    ...(isSuper ? [{ key: "testing" as TabType, label: "Testing", icon: "🧪" }] : []),
   ];
 
   /* ── Filtered products ── */
@@ -1664,6 +1666,11 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
               {tab === "guides" && (
                 <GuidesTab setTab={(t: string) => setTab(t as TabType)} isSuper={isSuper} />
               )}
+
+              {/* ══ PILOT TEST TAB — remove this block when done ══ */}
+              {tab === "testing" && (
+                <TestingTab adminFetch={adminFetch} showToast={showToast} />
+              )}
             </>
           )}
         </main>
@@ -2049,6 +2056,93 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
           }
         }
       `}</style>
+    </div>
+  );
+}
+
+/* ═════════════════════════════════════════════════════════════
+   PILOT TEST TAB — remove this entire component block when done.
+   Also delete: src/app/api/testing/ folder, the "testing" TabType,
+   the tab config line, and the render block in AdminDashboard.
+   ═════════════════════════════════════════════════════════════ */
+interface TestPushResult { phone: string; subscriptions: number; sent: number; failed: number; providers: string[]; }
+
+function TestingTab({ adminFetch, showToast }: {
+  adminFetch: (url: string, opts?: RequestInit) => Promise<Response>;
+  showToast: (msg: string, type?: "success" | "error" | "warn") => void;
+}) {
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<TestPushResult | null>(null);
+  const [error, setError] = useState("");
+
+  const sendTest = async () => {
+    const p = phone.trim();
+    if (!p) { showToast("Enter a phone number", "warn"); return; }
+    setSending(true); setError(""); setResult(null);
+    try {
+      const res = await adminFetch("/api/testing/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: p }) });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed"); showToast(data.error || "Failed", "error"); }
+      else {
+        setResult(data);
+        if (data.sent > 0) showToast(`Test sent to ${data.sent} device${data.sent > 1 ? "s" : ""} ✓`);
+        else if (data.subscriptions === 0) showToast("No notifications registered for this phone", "warn");
+        else showToast(`0 sent / ${data.failed} failed — subscription may be expired`, "error");
+      }
+    } catch { setError("Network error"); showToast("Network error", "error"); }
+    setSending(false);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: 560 }}>
+      <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "0.875rem", padding: "0.875rem 1rem" }}>
+        <p style={{ fontWeight: 800, fontSize: "0.8125rem", color: "#b45309", margin: 0 }}>🧪 Pilot Testing — temporary</p>
+        <p style={{ fontSize: "0.8125rem", color: "#92400e", fontWeight: 500, margin: "0.25rem 0 0" }}>This tab is for verifying push notifications work on a customer&apos;s device. It will be removed after testing.</p>
+      </div>
+
+      {/* Test Push */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "1rem", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div>
+          <h3 style={{ fontWeight: 800, fontSize: "0.875rem", color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Send Test Notification</h3>
+          <p style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 500, margin: "0.25rem 0 0" }}>Sends a test push to all devices registered under this phone. Have the customer&apos;s device ready.</p>
+        </div>
+        <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap" }}>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Customer phone (e.g. 01712345678)" style={{ ...INP, flex: 1, minWidth: 200 }} onKeyDown={(e) => { if (e.key === "Enter") sendTest(); }} />
+          <button disabled={sending} onClick={sendTest} style={{ ...BTN("green"), height: 42, padding: "0 1.5rem", fontSize: "0.875rem" }}>
+            {sending ? "Sending…" : "🔔 Send Test"}
+          </button>
+        </div>
+
+        {/* Diagnostics */}
+        {error && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "0.75rem", padding: "0.875rem 1rem", fontSize: "0.8125rem", fontWeight: 700, color: "#b91c1c" }}>⚠️ {error}</div>
+        )}
+        {result && (
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "0.875rem", padding: "1rem 1.125rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Diagnostics for {result.phone}</p>
+            {[
+              { label: "Registered devices", value: String(result.subscriptions), color: result.subscriptions > 0 ? "#059669" : "#b91c1c" },
+              { label: "Delivered", value: String(result.sent), color: result.sent > 0 ? "#059669" : "#94a3b8" },
+              { label: "Failed", value: String(result.failed), color: result.failed > 0 ? "#b91c1c" : "#94a3b8" },
+            ].map((r) => (
+              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#475569" }}>{r.label}</span>
+                <span style={{ fontSize: "0.9375rem", fontWeight: 800, color: r.color }}>{r.value}</span>
+              </div>
+            ))}
+            {result.providers.length > 0 && (
+              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "0.5rem", marginTop: "0.25rem" }}>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#94a3b8" }}>Push services: </span>
+                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#475569", fontFamily: "monospace" }}>{result.providers.join(", ")}</span>
+              </div>
+            )}
+            <p style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 500, margin: "0.25rem 0 0" }}>
+              {result.sent > 0 ? "✓ Device should buzz with the signature pattern. Confirm with the customer." : result.subscriptions === 0 ? "✗ This phone has no registered device. Customer must open /lookup and allow notifications." : "✗ Subscription exists but delivery failed — likely expired. Customer should re-allow notifications."}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

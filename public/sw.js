@@ -54,7 +54,7 @@ self.addEventListener("push", (event) => {
     body: data.body,
     icon: "/icons/android-chrome-192x192.png",
     badge: "/icons/android-chrome-192x192.png",
-    vibrate: [100, 50, 100],
+    vibrate: [120, 60, 120, 60, 280],
     data: { url: data.url || "/lookup" },
     actions: [
       { action: "open", title: "View Now" },
