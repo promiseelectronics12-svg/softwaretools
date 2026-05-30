@@ -3,13 +3,21 @@ import { getDb } from "@/lib/db";
 import { pushSubscriptions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-// Configure VAPID (runs once at module load)
-const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_KEY || "";
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
-const VAPID_EMAIL = process.env.VAPID_EMAIL || "mailto:support@dizistore.com";
+// Configure VAPID (runs once at module load).
+// Wrapped in try/catch so a malformed/missing key NEVER crashes the build or
+// any route that imports this module — push just gets disabled instead.
+const VAPID_PUBLIC = (process.env.NEXT_PUBLIC_VAPID_KEY || "").trim();
+const VAPID_PRIVATE = (process.env.VAPID_PRIVATE_KEY || "").trim();
+const VAPID_EMAIL = process.env.VAPID_EMAIL || "mailto:support@officialtoolstore.com";
 
+let vapidReady = false;
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
-  webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+  try {
+    webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+    vapidReady = true;
+  } catch (err) {
+    console.error("[Push] Invalid VAPID config — push disabled:", (err as Error).message);
+  }
 }
 
 interface PushPayload {
@@ -26,8 +34,8 @@ export async function sendPushToPhone(
   phone: string,
   payload: PushPayload
 ): Promise<{ sent: number; failed: number }> {
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
-    console.warn("[Push] VAPID keys not configured, skipping push");
+  if (!vapidReady) {
+    console.warn("[Push] VAPID not configured/invalid, skipping push");
     return { sent: 0, failed: 0 };
   }
 
