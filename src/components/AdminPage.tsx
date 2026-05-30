@@ -1300,10 +1300,8 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                     const isLow = p.stock < 10;
                     return (
                       <div key={p.id} style={{ background: "#fff", border: `1.5px solid ${isLow ? "#fde68a" : "#e8edf3"}`, borderRadius: "1.125rem", padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "0.875rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", flexWrap: "wrap" }}>
-                        {p.image ? (
-                          <img src={p.image} alt={p.nameEn} style={{ width: 44, height: 44, borderRadius: "0.875rem", objectFit: "cover", flexShrink: 0, border: "1px solid rgba(0,0,0,0.08)" }} onError={(e) => { (e.currentTarget as HTMLImageElement).replaceWith(Object.assign(document.createElement("div"), { textContent: p.icon || "📦", style: `width:44px;height:44px;border-radius:.875rem;background:${p.iconBg||"#e8f5e9"};display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;border:1px solid rgba(0,0,0,.06)` })); }} />
-                        ) : (
-                          <div style={{ width: 44, height: 44, borderRadius: "0.875rem", background: p.iconBg || "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem", flexShrink: 0, border: "1px solid rgba(0,0,0,0.06)" }}>{p.icon || "📦"}</div>
+                        {p.image && (
+                          <img src={p.image} alt={p.nameEn} style={{ width: 44, height: 44, borderRadius: "0.875rem", objectFit: "cover", flexShrink: 0, border: "1px solid rgba(0,0,0,0.08)" }} />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nameEn}</p>
