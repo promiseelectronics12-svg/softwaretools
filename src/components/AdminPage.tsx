@@ -376,7 +376,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
 
   /* ── Quick Deliver ── */
   const [quickDeliverOrderId, setQuickDeliverOrderId] = useState<number | null>(null);
-  const [quickForm, setQuickForm] = useState({ username: "", password: "", totpSecret: "", notes: "", expiryDate: "" });
+  const [quickForms, setQuickForms] = useState<{ username: string; password: string; totpSecret: string; notes: string; expiryDate: string }[]>([]);
   const [quickDelivering, setQuickDelivering] = useState(false);
   const [copiedCredId, setCopiedCredId]       = useState<number | null>(null);
 
@@ -690,49 +690,57 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
 
   /* ── Quick Deliver ── */
   const openQuickDeliver = (order: Order) => {
-    const firstItem = order.items[0];
-    const dur  = firstItem?.duration || "1 Month";
-    const days = parseDurationDays(dur);
-    const expiry = new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
-    setQuickForm({ username: "", password: "", totpSecret: "", notes: "", expiryDate: expiry });
+    const forms = order.items.map((item) => {
+      const days = parseDurationDays(item.duration);
+      const expiry = new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
+      return { username: "", password: "", totpSecret: "", notes: "", expiryDate: expiry };
+    });
+    setQuickForms(forms.length > 0 ? forms : [{ username: "", password: "", totpSecret: "", notes: "", expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0] }]);
     setQuickDeliverOrderId(order.id);
     setExpandedOrders((prev) => { const next = new Set(prev); next.add(order.id); return next; });
   };
 
   const handleQuickDeliver = async (order: Order) => {
-    if (!quickForm.username.trim() || !quickForm.password.trim()) {
-      showToast("Username and password are required", "error"); return;
+    for (let i = 0; i < quickForms.length; i++) {
+      if (!quickForms[i].username.trim() || !quickForms[i].password.trim()) {
+        showToast(`Enter username & password for ${order.items[i]?.nameEn || `item ${i + 1}`}`, "error");
+        return;
+      }
     }
     setQuickDelivering(true);
     try {
-      const firstItem = order.items[0];
-      const dur  = firstItem?.duration || "1 Month";
-      const credRes = await adminFetch("/api/credentials", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.id, orderCode: order.orderCode,
-          phone: order.phone || "",
-          productName: firstItem?.nameEn || order.items.map((i) => i.nameEn).join(", "),
-          duration: dur,
-          username: quickForm.username.trim(), password: quickForm.password.trim(),
-          notes: quickForm.notes.trim(),
-          totpSecret: quickForm.totpSecret.trim() || null,
-          startDate: new Date().toISOString(),
-          expiryDate: new Date(quickForm.expiryDate).toISOString(),
-        }),
-      });
-      const credData = await credRes.json();
-      if (!credData.credential) { showToast("Failed to save credential", "error"); setQuickDelivering(false); return; }
-      setCredentials((prev) => [...prev, credData.credential]);
+      const newCreds: typeof credentials = [];
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const form = quickForms[i] ?? quickForms[0];
+        const credRes = await adminFetch("/api/credentials", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: order.id, orderCode: order.orderCode,
+            phone: order.phone || "",
+            productName: item.nameEn,
+            duration: item.duration,
+            username: form.username.trim(), password: form.password.trim(),
+            notes: form.notes.trim(),
+            totpSecret: form.totpSecret.trim() || null,
+            startDate: new Date().toISOString(),
+            expiryDate: new Date(form.expiryDate).toISOString(),
+          }),
+        });
+        const credData = await credRes.json();
+        if (!credData.credential) { showToast(`Failed to save credential for ${item.nameEn}`, "error"); setQuickDelivering(false); return; }
+        newCreds.push(credData.credential);
+      }
+      setCredentials((prev) => [...prev, ...newCreds]);
 
       const ordRes = await adminFetch(`/api/orders/${order.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "completed" }) });
       const ordData = await ordRes.json();
       if (ordData.order) setOrders((prev) => prev.map((o) => o.id === order.id ? ordData.order : o));
 
       setQuickDeliverOrderId(null);
-      setQuickForm({ username: "", password: "", totpSecret: "", notes: "", expiryDate: "" });
+      setQuickForms([]);
       setExpandedOrders((prev) => { const next = new Set(prev); next.delete(order.id); return next; });
-      showToast(`✓ Delivered to ${order.phone || order.orderCode}!`);
+      showToast(`✓ ${newCreds.length} credential${newCreds.length > 1 ? "s" : ""} delivered to ${order.phone || order.orderCode}!`);
     } catch { showToast("Delivery failed", "error"); }
     setQuickDelivering(false);
   };
@@ -1114,7 +1122,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                         const canDeliver  = (o.status === "pending" || o.status === "verified" || o.status === "completed") && !isDelivered;
 
                         return (
-                          <div key={o.id} style={{ background: o.status === "pending" ? "linear-gradient(to right,#fffbeb 0%,#fff 60%)" : "#fff", border: `1px solid ${isSelected ? "#10b981" : "#e8edf3"}`, borderLeft: `4px solid ${STATUS_COLORS[o.status]?.dot || "#e2e8f0"}`, borderRadius: "1.125rem", overflow: "hidden", minWidth: 0, boxShadow: isExpanded ? "0 4px 16px rgba(0,0,0,0.07)" : "0 1px 3px rgba(0,0,0,0.04)", transition: "all 0.2s ease" }}>
+                          <div key={o.id} style={{ background: "#fff", border: `1.5px solid ${isSelected ? "#10b981" : o.status === "pending" ? "rgba(245,158,11,0.3)" : "#e8edf3"}`, borderTop: `3px solid ${isSelected ? "#10b981" : STATUS_COLORS[o.status]?.dot || "#e2e8f0"}`, borderRadius: "0.875rem", overflow: "hidden", minWidth: 0, boxShadow: isExpanded ? "0 6px 20px rgba(0,0,0,0.08)" : "0 1px 4px rgba(0,0,0,0.05)", transition: "all 0.2s ease" }}>
                             {/* Compact row */}
                             <div className="order-row" style={{ padding: "0.875rem 1.25rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "nowrap", minWidth: 0, cursor: "pointer" }} onClick={() => toggleExpandOrder(o.id)}>
                               <input type="checkbox" checked={isSelected} onChange={() => toggleSelectOrder(o.id)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16, flexShrink: 0 }} />
@@ -1198,47 +1206,71 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                                   </div>
                                 </div>
 
-                                {/* Quick Deliver form */}
+                                {/* Quick Deliver — one section per item */}
                                 {isQuickOpen && !isDelivered && (
-                                  <div style={{ background: "#fff", borderRadius: "1rem", padding: "1.25rem", border: "2px solid rgba(16,185,129,0.2)", boxShadow: "0 4px 16px rgba(16,185,129,0.08)" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "1rem" }}>
-                                      <div style={{ width: 32, height: 32, borderRadius: "0.625rem", background: "linear-gradient(135deg,#00c853,#059669)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <div style={{ background: "#f8fafc", borderRadius: "1rem", padding: "1.25rem", border: "1.5px solid rgba(16,185,129,0.18)", boxShadow: "0 4px 20px rgba(16,185,129,0.07)" }}>
+                                    {/* Header */}
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "1.125rem" }}>
+                                      <div style={{ width: 32, height: 32, borderRadius: "0.625rem", background: "linear-gradient(135deg,#00c853,#059669)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                         <span style={{ fontSize: "1rem" }}>⚡</span>
                                       </div>
                                       <div>
-                                        <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#0f172a" }}>Quick Deliver</p>
-                                        <p style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600 }}>Fill credentials → saves & completes order in one click</p>
+                                        <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#0f172a", margin: 0 }}>Quick Deliver</p>
+                                        <p style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, margin: 0 }}>{o.items.length} product{o.items.length > 1 ? "s" : ""} — fill credentials for each</p>
                                       </div>
                                     </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "0.875rem", marginBottom: "1rem" }}>
-                                      {[
-                                        { label: "Username / Email *", key: "username", ph: "user@example.com" },
-                                        { label: "Password *",         key: "password", ph: "••••••••" },
-                                        { label: "TOTP Secret (opt.)", key: "totpSecret", ph: "JBSWY3DPEHPK3PXP" },
-                                        { label: "Notes",              key: "notes", ph: "Any notes..." },
-                                      ].map((f) => (
-                                        <div key={f.key}>
-                                          <label style={LABEL}>{f.label}</label>
-                                          <input
-                                            type="text" placeholder={f.ph}
-                                            value={(quickForm as Record<string, string>)[f.key]}
-                                            onChange={(e) => setQuickForm((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                                            style={{ ...INP, fontFamily: f.key === "totpSecret" ? "monospace" : "inherit" }}
-                                          />
-                                        </div>
-                                      ))}
-                                      <div>
-                                        <label style={LABEL}>Expiry Date *</label>
-                                        <input type="date" value={quickForm.expiryDate} onChange={(e) => setQuickForm((prev) => ({ ...prev, expiryDate: e.target.value }))} style={INP} />
-                                      </div>
+
+                                    {/* One card per item */}
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem", marginBottom: "1.125rem" }}>
+                                      {o.items.map((item, idx) => {
+                                        const form = quickForms[idx];
+                                        if (!form) return null;
+                                        return (
+                                          <div key={idx} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "0.875rem", padding: "1rem 1.125rem" }}>
+                                            {/* Item header */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.875rem" }}>
+                                              <span style={{ width: 22, height: 22, borderRadius: "9999px", background: "rgba(16,185,129,0.1)", border: "1.5px solid rgba(16,185,129,0.25)", fontSize: "0.6875rem", fontWeight: 800, color: "#059669", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</span>
+                                              <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "#0f172a" }}>{item.nameEn}</span>
+                                              <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>· {item.duration}</span>
+                                            </div>
+                                            {/* Credential fields */}
+                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "0.75rem" }}>
+                                              {[
+                                                { label: "Username / Email *", key: "username", ph: "user@example.com" },
+                                                { label: "Password *",         key: "password", ph: "••••••••" },
+                                                { label: "TOTP Secret (opt.)", key: "totpSecret", ph: "JBSWY3DPEHPK3PXP" },
+                                                { label: "Notes (opt.)",       key: "notes",     ph: "e.g. profile name..." },
+                                              ].map((f) => (
+                                                <div key={f.key}>
+                                                  <label style={LABEL}>{f.label}</label>
+                                                  <input
+                                                    type="text" placeholder={f.ph}
+                                                    value={(form as Record<string, string>)[f.key]}
+                                                    onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], [f.key]: e.target.value }; return next; })}
+                                                    style={{ ...INP, fontFamily: f.key === "totpSecret" ? "monospace" : "inherit" }}
+                                                  />
+                                                </div>
+                                              ))}
+                                              <div>
+                                                <label style={LABEL}>Expiry Date *</label>
+                                                <input type="date" value={form.expiryDate}
+                                                  onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], expiryDate: e.target.value }; return next; })}
+                                                  style={INP} />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
+
+                                    {/* Action buttons */}
                                     <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap" }}>
                                       <button
                                         disabled={quickDelivering}
                                         onClick={() => handleQuickDeliver(o)}
                                         style={{ height: 42, padding: "0 1.5rem", background: quickDelivering ? "#94a3b8" : "linear-gradient(135deg,#00c853,#059669)", border: "none", borderRadius: "0.75rem", color: "#fff", fontSize: "0.875rem", fontWeight: 800, cursor: quickDelivering ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 12px rgba(16,185,129,0.25)" }}
                                       >
-                                        {quickDelivering ? "Delivering..." : "✓ Deliver & Complete"}
+                                        {quickDelivering ? "Delivering..." : `✓ Deliver ${o.items.length > 1 ? `${o.items.length} Credentials` : "& Complete"}`}
                                       </button>
                                       {o.status === "pending" && (
                                         <button onClick={() => updateOrderStatus(o.id, "verified")} style={{ ...BTN("blue"), height: 42, padding: "0 1.125rem" }}>✓ Verify First</button>
