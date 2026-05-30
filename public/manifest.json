@@ -1,7 +1,7 @@
 {
-  "name": "DiziStore — Premium Digital Tools",
-  "short_name": "Tool Store",
-  "description": "Instant access to premium accounts & subscriptions.",
+  "name": "DiziStore Bangladesh — Premium Digital Tools",
+  "short_name": "DiziStore",
+  "description": "Buy premium digital tools, online subscriptions, AI tools, streaming accounts, and software services in Bangladesh with fast delivery and secure support.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f5f7f5",
@@ -10,22 +10,22 @@
   "categories": ["shopping", "utilities"],
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "/icons/android-chrome-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "/icons/android-chrome-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-maskable-512x512.png",
-      "sizes": "512x512",
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any"
     }
   ]
 }

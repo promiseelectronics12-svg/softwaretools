@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate:favicons": "node scripts/generate-favicons.js \"C:\\Users\\U I S\\Downloads\\ChatGPT Image May 26, 2026, 01_45_55 AM.png\""
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -16,8 +17,10 @@
     "jose": "^6.2.3",
     "next": "^15.5.18",
     "otpauth": "^9.5.1",
+    "png-to-ico": "^2.1.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "sharp": "^0.34.5",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

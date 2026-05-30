@@ -10,6 +10,11 @@ const outfit = Outfit({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://dizistore.com";
+const siteName = "DiziStore";
+const siteDescription =
+  "Buy premium digital tools, online subscriptions, AI tools, streaming accounts, and software services in Bangladesh with fast delivery and secure support.";
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -18,21 +23,75 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Official Tool Store — Premium Digital Tools",
-  description:
-    "Instant access to premium accounts & subscriptions. Lightning-fast delivery.",
-  keywords: ["premium tools", "digital subscriptions", "streaming", "AI tools"],
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "DiziStore Bangladesh — Premium Digital Tools & Subscriptions",
+    template: "%s | DiziStore Bangladesh",
+  },
+  description: siteDescription,
+  applicationName: siteName,
+  category: "shopping",
+  keywords: [
+    "DiziStore",
+    "digital tools Bangladesh",
+    "premium tools Bangladesh",
+    "online subscriptions Bangladesh",
+    "AI tools Bangladesh",
+    "streaming accounts Bangladesh",
+    "software tools Bangladesh",
+    "premium accounts BD",
+    "buy digital services Bangladesh",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicons/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: {
-    title: "Official Tool Store — Premium Digital Tools",
-    description:
-      "Instant access to premium accounts & subscriptions. Lightning-fast delivery.",
+    title: "DiziStore Bangladesh — Premium Digital Tools & Subscriptions",
+    description: siteDescription,
+    url: "/",
+    siteName,
+    locale: "en_BD",
     type: "website",
+    images: [
+      {
+        url: "/icons/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "DiziStore premium digital tools and subscriptions in Bangladesh",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DiziStore Bangladesh — Premium Digital Tools & Subscriptions",
+    description: siteDescription,
+    images: ["/icons/og-image.png"],
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Tool Store",
+    title: siteName,
   },
 };
 
@@ -41,10 +100,58 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: siteName,
+        url: siteUrl,
+        logo: `${siteUrl}/icons/icon-512x512.png`,
+        areaServed: {
+          "@type": "Country",
+          name: "Bangladesh",
+        },
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        name: `${siteName} Bangladesh`,
+        url: siteUrl,
+        description: siteDescription,
+        inLanguage: "en-BD",
+        publisher: {
+          "@id": `${siteUrl}/#organization`,
+        },
+      },
+      {
+        "@type": "OnlineStore",
+        "@id": `${siteUrl}/#store`,
+        name: `${siteName} Bangladesh`,
+        url: siteUrl,
+        description: siteDescription,
+        image: `${siteUrl}/icons/og-image.png`,
+        areaServed: {
+          "@type": "Country",
+          name: "Bangladesh",
+        },
+        currenciesAccepted: "BDT",
+        paymentAccepted: "Online payment, Mobile banking",
+      },
+    ],
+  };
+
   return (
     <html lang="en" className={outfit.variable}>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <meta name="geo.region" content="BD" />
+        <meta name="geo.placename" content="Bangladesh" />
+        <meta name="distribution" content="Bangladesh" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body>
         <ClientProviders>{children}</ClientProviders>
