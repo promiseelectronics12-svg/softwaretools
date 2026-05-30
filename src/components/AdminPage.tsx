@@ -374,10 +374,9 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
   const [ordersPage, setOrdersPage]         = useState(1);
 
-  /* ── Quick Deliver ── */
-  const [quickDeliverOrderId, setQuickDeliverOrderId] = useState<number | null>(null);
-  const [quickForms, setQuickForms] = useState<{ username: string; password: string; totpSecret: string; notes: string; expiryDate: string }[]>([]);
-  const [quickSelected, setQuickSelected] = useState<Set<number>>(new Set()); // indices selected for delivery
+  /* ── Single-Item Delivery Modal ── */
+  const [deliverTarget, setDeliverTarget] = useState<{ order: Order; itemIdx: number } | null>(null);
+  const [deliverForm, setDeliverForm] = useState({ username: "", password: "", totpSecret: "", notes: "", expiryDate: "", showTotp: false, showNotes: false, showPass: false });
   const [quickDelivering, setQuickDelivering] = useState(false);
   const [copiedCredId, setCopiedCredId]       = useState<number | null>(null);
 
@@ -690,82 +689,55 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
   const toggleExpandOrder = (id: number) => setExpandedOrders((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   /* ── Quick Deliver ── */
-  const openQuickDeliver = (order: Order) => {
-    const forms = order.items.map((item) => {
-      const days = parseDurationDays(item.duration);
-      const expiry = new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
-      return { username: "", password: "", totpSecret: "", notes: "", expiryDate: expiry };
-    });
-    setQuickForms(forms.length > 0 ? forms : [{ username: "", password: "", totpSecret: "", notes: "", expiryDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0] }]);
-    // Pre-select only items not yet delivered
-    const alreadyDelivered = new Set(
-      credentials.filter((c) => c.orderCode === order.orderCode).map((c) => c.productName)
-    );
-    const selected = new Set(
-      order.items.map((item, idx) => idx).filter((idx) => !alreadyDelivered.has(order.items[idx].nameEn))
-    );
-    setQuickSelected(selected);
-    setQuickDeliverOrderId(order.id);
-    setExpandedOrders((prev) => { const next = new Set(prev); next.add(order.id); return next; });
+  const openDeliverModal = (order: Order, itemIdx: number) => {
+    const item = order.items[itemIdx];
+    const days = parseDurationDays(item?.duration || "1 Month");
+    const expiry = new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
+    setDeliverForm({ username: "", password: "", totpSecret: "", notes: "", expiryDate: expiry, showTotp: false, showNotes: false, showPass: false });
+    setDeliverTarget({ order, itemIdx });
   };
 
-  const handleQuickDeliver = async (order: Order) => {
-    const toDeliver = order.items.filter((_, idx) => quickSelected.has(idx));
-    if (toDeliver.length === 0) { showToast("Select at least one item to deliver", "warn"); return; }
-
-    for (const idx of quickSelected) {
-      const form = quickForms[idx];
-      if (!form?.username.trim() || !form?.password.trim()) {
-        showToast(`Enter username & password for ${order.items[idx]?.nameEn || `item ${idx + 1}`}`, "error");
-        return;
-      }
+  const handleSingleDeliver = async () => {
+    if (!deliverTarget) return;
+    const { order, itemIdx } = deliverTarget;
+    const item = order.items[itemIdx];
+    if (!deliverForm.username.trim() || !deliverForm.password.trim()) {
+      showToast("Username and password are required", "error"); return;
     }
-
     setQuickDelivering(true);
     try {
-      const newCreds: typeof credentials = [];
-      for (const idx of quickSelected) {
-        const item = order.items[idx];
-        const form = quickForms[idx];
-        const credRes = await adminFetch("/api/credentials", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderId: order.id, orderCode: order.orderCode,
-            phone: order.phone || "",
-            productName: item.nameEn, duration: item.duration,
-            username: form.username.trim(), password: form.password.trim(),
-            notes: form.notes.trim(),
-            totpSecret: form.totpSecret.trim() || null,
-            startDate: new Date().toISOString(),
-            expiryDate: new Date(form.expiryDate).toISOString(),
-          }),
-        });
-        const credData = await credRes.json();
-        if (!credData.credential) { showToast(`Failed: ${item.nameEn}`, "error"); setQuickDelivering(false); return; }
-        newCreds.push(credData.credential);
-      }
-      const allCreds = [...credentials, ...newCreds];
+      const credRes = await adminFetch("/api/credentials", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id, orderCode: order.orderCode,
+          phone: order.phone || "",
+          productName: item.nameEn, duration: item.duration,
+          username: deliverForm.username.trim(), password: deliverForm.password.trim(),
+          notes: deliverForm.notes.trim(),
+          totpSecret: deliverForm.totpSecret.trim() || null,
+          startDate: new Date().toISOString(),
+          expiryDate: new Date(deliverForm.expiryDate).toISOString(),
+        }),
+      });
+      const credData = await credRes.json();
+      if (!credData.credential) { showToast(`Failed to save credential`, "error"); setQuickDelivering(false); return; }
+
+      const allCreds = [...credentials, credData.credential];
       setCredentials(allCreds);
 
-      // All items delivered? → completed. Some still pending? → verified
+      // Check if all items now delivered → complete the order
       const deliveredNames = new Set(allCreds.filter((c) => c.orderCode === order.orderCode).map((c) => c.productName));
-      const allDone = order.items.every((item) => deliveredNames.has(item.nameEn));
+      const allDone = order.items.every((it) => deliveredNames.has(it.nameEn));
       const newStatus = allDone ? "completed" : "verified";
-
       const ordRes = await adminFetch(`/api/orders/${order.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: newStatus }) });
       const ordData = await ordRes.json();
       if (ordData.order) setOrders((prev) => prev.map((o) => o.id === order.id ? ordData.order : o));
 
-      setQuickDeliverOrderId(null);
-      setQuickForms([]);
-      setQuickSelected(new Set());
-      setExpandedOrders((prev) => { const next = new Set(prev); next.delete(order.id); return next; });
-
-      if (allDone) {
-        showToast(`✓ All ${newCreds.length} credentials delivered — order complete!`);
-      } else {
+      setDeliverTarget(null);
+      if (allDone) showToast(`✓ All credentials delivered — order complete!`);
+      else {
         const remaining = order.items.length - deliveredNames.size;
-        showToast(`✓ ${newCreds.length} delivered — ${remaining} still pending`, "warn");
+        showToast(`✓ ${item.nameEn} delivered — ${remaining} item${remaining !== 1 ? "s" : ""} remaining`, "warn");
       }
     } catch { showToast("Delivery failed", "error"); }
     setQuickDelivering(false);
@@ -1144,8 +1116,6 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                         const isSelected = selectedOrders.has(o.id);
                         const isExpanded = expandedOrders.has(o.id);
                         const isDelivered = deliveredOrderCodes.has(o.orderCode);
-                        const isQuickOpen = quickDeliverOrderId === o.id;
-                        const canDeliver  = (o.status === "pending" || o.status === "verified" || o.status === "completed") && !isDelivered;
 
                         return (
                           <div key={o.id} style={{ background: "#fff", border: `1.5px solid ${isSelected ? "#10b981" : o.status === "pending" ? "rgba(245,158,11,0.3)" : "#e8edf3"}`, borderTop: `3px solid ${isSelected ? "#10b981" : STATUS_COLORS[o.status]?.dot || "#e2e8f0"}`, borderRadius: "0.875rem", overflow: "hidden", minWidth: 0, boxShadow: isExpanded ? "0 6px 20px rgba(0,0,0,0.08)" : "0 1px 4px rgba(0,0,0,0.05)", transition: "all 0.2s ease" }}>
@@ -1189,11 +1159,6 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                                   <button onClick={() => updateOrderStatus(o.id, "verified")} style={{ ...BTN("blue"), height: 30, padding: "0 0.625rem", fontSize: "0.6875rem" }}>✓ Verify</button>
                                   <button onClick={() => updateOrderStatus(o.id, "failed")}   style={{ ...BTN("red"),  height: 30, padding: "0 0.625rem", fontSize: "0.6875rem" }}>✗</button>
                                 </>}
-                                {canDeliver && (
-                                  <button onClick={() => openQuickDeliver(o)} style={{ height: 30, padding: "0 0.75rem", borderRadius: "0.5rem", background: "linear-gradient(135deg,#00c853,#059669)", border: "none", color: "#fff", fontSize: "0.6875rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                                    ⚡ Deliver
-                                  </button>
-                                )}
                               </div>
 
                               {/* Expand chevron */}
@@ -1219,127 +1184,40 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                                   ))}
                                 </div>
 
-                                {/* Items */}
-                                <div style={{ marginBottom: "1rem" }}>
-                                  <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>Items</p>
+                                {/* Items — per-item Deliver button */}
+                                <div style={{ marginBottom: "0.75rem" }}>
+                                  <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.5rem" }}>
+                                    Items · {o.items.filter((it) => credentials.some((c) => c.orderCode === o.orderCode && c.productName === it.nameEn)).length}/{o.items.length} delivered
+                                  </p>
                                   <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                                    {o.items.map((it, idx) => (
-                                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", borderRadius: "0.625rem", padding: "0.625rem 0.875rem", border: "1px solid #e8edf3" }}>
-                                        <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#0f172a" }}>{it.nameEn} <span style={{ color: "#94a3b8", fontWeight: 600 }}>· {it.duration}</span></span>
-                                        <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "#059669" }}>৳{it.priceBdt}</span>
-                                      </div>
-                                    ))}
+                                    {o.items.map((it, idx) => {
+                                      const itemDelivered = credentials.some((c) => c.orderCode === o.orderCode && c.productName === it.nameEn);
+                                      return (
+                                        <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: itemDelivered ? "#f0fdf4" : "#fff", borderRadius: "0.75rem", padding: "0.625rem 0.875rem", border: `1px solid ${itemDelivered ? "#bbf7d0" : "#e8edf3"}` }}>
+                                          <span style={{ width: 20, height: 20, borderRadius: "9999px", background: itemDelivered ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.08)", fontSize: "0.6rem", fontWeight: 800, color: itemDelivered ? "#059669" : "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</span>
+                                          <span style={{ fontSize: "0.875rem", fontWeight: 700, color: itemDelivered ? "#15803d" : "#0f172a", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.nameEn}</span>
+                                          <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, flexShrink: 0 }}>{it.duration}</span>
+                                          <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "#059669", flexShrink: 0 }}>৳{it.priceBdt}</span>
+                                          {itemDelivered ? (
+                                            <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#059669", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.2rem 0.625rem", borderRadius: "9999px", flexShrink: 0 }}>✓ Delivered</span>
+                                          ) : (
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); openDeliverModal(o, idx); }}
+                                              style={{ height: 30, padding: "0 0.75rem", borderRadius: "0.5rem", background: "linear-gradient(135deg,#00c853,#059669)", border: "none", color: "#fff", fontSize: "0.6875rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                                              ⚡ Deliver
+                                            </button>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
 
-                                {/* Quick Deliver — one section per item */}
-                                {isQuickOpen && !isDelivered && (
-                                  <div style={{ background: "#f8fafc", borderRadius: "1rem", padding: "1.25rem", border: "1.5px solid rgba(16,185,129,0.18)", boxShadow: "0 4px 20px rgba(16,185,129,0.07)" }}>
-                                    {/* Header */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "1.125rem" }}>
-                                      <div style={{ width: 32, height: 32, borderRadius: "0.625rem", background: "linear-gradient(135deg,#00c853,#059669)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                        <span style={{ fontSize: "1rem" }}>⚡</span>
-                                      </div>
-                                      <div>
-                                        <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#0f172a", margin: 0 }}>Quick Deliver</p>
-                                        <p style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, margin: 0 }}>{o.items.length} product{o.items.length > 1 ? "s" : ""} — fill credentials for each</p>
-                                      </div>
-                                    </div>
-
-                                    {/* One card per item */}
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.125rem" }}>
-                                      {o.items.map((item, idx) => {
-                                        const form = quickForms[idx];
-                                        const alreadyDelivered = credentials.some((c) => c.orderCode === o.orderCode && c.productName === item.nameEn);
-                                        const isSelected = quickSelected.has(idx);
-
-                                        return (
-                                          <div key={idx} style={{ background: alreadyDelivered ? "#f0fdf4" : isSelected ? "#fff" : "#f8fafc", border: `1px solid ${alreadyDelivered ? "#bbf7d0" : isSelected ? "#e2e8f0" : "#e2e8f0"}`, borderRadius: "0.875rem", padding: "0.875rem 1rem", opacity: !isSelected && !alreadyDelivered ? 0.6 : 1 }}>
-
-                                            {/* Item header with checkbox */}
-                                            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: alreadyDelivered || !isSelected ? 0 : "0.875rem" }}>
-                                              {alreadyDelivered ? (
-                                                <span style={{ fontSize: "1rem", flexShrink: 0 }}>✅</span>
-                                              ) : (
-                                                <input type="checkbox" checked={isSelected}
-                                                  onChange={() => setQuickSelected((prev) => { const next = new Set(prev); isSelected ? next.delete(idx) : next.add(idx); return next; })}
-                                                  style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0, accentColor: "#10b981" }}
-                                                />
-                                              )}
-                                              <span style={{ width: 20, height: 20, borderRadius: "9999px", background: alreadyDelivered ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.1)", fontSize: "0.625rem", fontWeight: 800, color: alreadyDelivered ? "#059669" : "#64748b", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</span>
-                                              <span style={{ fontWeight: 700, fontSize: "0.875rem", color: alreadyDelivered ? "#15803d" : "#0f172a", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.nameEn}</span>
-                                              <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 600, flexShrink: 0 }}>{item.duration}</span>
-                                              {alreadyDelivered && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#059669", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "0.1rem 0.5rem", borderRadius: "9999px", flexShrink: 0 }}>Delivered</span>}
-                                              {!alreadyDelivered && !isSelected && <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#94a3b8", flexShrink: 0 }}>Skipped</span>}
-                                            </div>
-
-                                            {/* Credential fields — only if selected and not already delivered */}
-                                            {!alreadyDelivered && isSelected && form && (
-                                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "0.75rem" }}>
-                                                {[
-                                                  { label: "Username / Email *", key: "username", ph: "user@example.com" },
-                                                  { label: "Password *",         key: "password", ph: "••••••••" },
-                                                  { label: "TOTP Secret (opt.)", key: "totpSecret", ph: "JBSWY3DPEHPK3PXP" },
-                                                  { label: "Notes (opt.)",       key: "notes",     ph: "e.g. profile name..." },
-                                                ].map((f) => (
-                                                  <div key={f.key}>
-                                                    <label style={LABEL}>{f.label}</label>
-                                                    <input type="text" placeholder={f.ph}
-                                                      value={(form as Record<string, string>)[f.key]}
-                                                      onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], [f.key]: e.target.value }; return next; })}
-                                                      style={{ ...INP, fontFamily: f.key === "totpSecret" ? "monospace" : "inherit" }}
-                                                    />
-                                                  </div>
-                                                ))}
-                                                <div>
-                                                  <label style={LABEL}>Expiry Date *</label>
-                                                  <input type="date" value={form.expiryDate}
-                                                    onChange={(e) => setQuickForms((prev) => { const next = [...prev]; next[idx] = { ...next[idx], expiryDate: e.target.value }; return next; })}
-                                                    style={INP} />
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-
-                                    {/* Summary + action buttons */}
-                                    {(() => {
-                                      const selectedCount = quickSelected.size;
-                                      const alreadyCount  = o.items.filter((item) => credentials.some((c) => c.orderCode === o.orderCode && c.productName === item.nameEn)).length;
-                                      const remaining     = o.items.length - alreadyCount - selectedCount;
-                                      const allWillBeDone = alreadyCount + selectedCount >= o.items.length;
-                                      return (
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                                          {selectedCount < o.items.length - alreadyCount && (
-                                            <div style={{ padding: "0.625rem 0.875rem", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "0.75rem", fontSize: "0.8125rem", fontWeight: 600, color: "#92400e" }}>
-                                              ⚠️ Partial delivery — {remaining} item{remaining !== 1 ? "s" : ""} will remain pending. Order stays &quot;verified&quot; until all are delivered.
-                                            </div>
-                                          )}
-                                          <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap" }}>
-                                            <button disabled={quickDelivering || selectedCount === 0}
-                                              onClick={() => handleQuickDeliver(o)}
-                                              style={{ height: 42, padding: "0 1.5rem", background: quickDelivering || selectedCount === 0 ? "#94a3b8" : "linear-gradient(135deg,#00c853,#059669)", border: "none", borderRadius: "0.75rem", color: "#fff", fontSize: "0.875rem", fontWeight: 800, cursor: quickDelivering || selectedCount === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: selectedCount > 0 ? "0 4px 12px rgba(16,185,129,0.25)" : "none" }}>
-                                              {quickDelivering ? "Delivering..." : allWillBeDone ? `✓ Deliver ${selectedCount} — Complete Order` : `⚡ Deliver ${selectedCount} of ${o.items.length}`}
-                                            </button>
-                                            {o.status === "pending" && <button onClick={() => updateOrderStatus(o.id, "verified")} style={{ ...BTN("blue"), height: 42, padding: "0 1.125rem" }}>✓ Verify First</button>}
-                                            <button onClick={() => updateOrderStatus(o.id, "failed")} style={{ ...BTN("red"), height: 42, padding: "0 1.125rem" }}>✗ Fail Order</button>
-                                            <button onClick={() => setQuickDeliverOrderId(null)} style={{ ...BTN("ghost"), height: 42, padding: "0 1rem" }}>Cancel</button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })()}
-                                  </div>
-                                )}
-
-                                {/* Already delivered */}
-                                {isDelivered && (
-                                  <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "0.875rem", padding: "0.875rem 1rem", display: "flex", alignItems: "center", gap: "0.625rem" }}>
-                                    <span style={{ fontSize: "1.25rem" }}>✅</span>
-                                    <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "#15803d" }}>Credentials already delivered for this order.</p>
-                                  </div>
-                                )}
+                                {/* Order actions */}
+                                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                                  {o.status === "pending" && <button onClick={() => updateOrderStatus(o.id, "verified")} style={{ ...BTN("blue"), height: 34 }}>✓ Verify Payment</button>}
+                                  {o.status !== "failed" && <button onClick={() => updateOrderStatus(o.id, "failed")} style={{ ...BTN("red"), height: 34 }}>✗ Fail Order</button>}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1926,6 +1804,115 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
 
       {/* Confirm Modal */}
       {dialog && <ConfirmModal dialog={dialog} onClose={() => setDialog(null)} />}
+
+      {/* ══ DELIVER MODAL ══ */}
+      {deliverTarget && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(6px)", padding: "1rem" }}>
+          <div style={{ background: "#fff", borderRadius: "1.5rem", width: "100%", maxWidth: 480, boxShadow: "0 32px 80px rgba(0,0,0,0.22)", animation: "modalIn 0.18s ease", overflow: "hidden" }}>
+
+            {/* Modal header */}
+            <div style={{ padding: "1.375rem 1.5rem 1.25rem", borderBottom: "1px solid #f1f5f9", background: "linear-gradient(135deg,rgba(0,200,83,0.04),rgba(255,255,255,0))" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "0.75rem", background: "linear-gradient(135deg,#00c853,#059669)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: "1.0625rem" }}>⚡</span>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#0f172a", margin: 0 }}>Deliver Credential</p>
+                    <p style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, margin: 0 }}>Focused entry — one product at a time</p>
+                  </div>
+                </div>
+                <button onClick={() => setDeliverTarget(null)} style={{ width: 32, height: 32, borderRadius: "0.625rem", background: "#f8fafc", border: "1px solid #e2e8f0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: "1rem", fontFamily: "inherit" }}>✕</button>
+              </div>
+              {/* Product info */}
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "0.875rem", padding: "0.75rem 1rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <p style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#0f172a", margin: 0 }}>
+                  {deliverTarget.order.items[deliverTarget.itemIdx]?.nameEn}
+                </p>
+                <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, margin: 0 }}>
+                  {deliverTarget.order.items[deliverTarget.itemIdx]?.duration} · 📱 {deliverTarget.order.phone || "—"} · {deliverTarget.order.orderCode}
+                </p>
+              </div>
+            </div>
+
+            {/* Form */}
+            <div style={{ padding: "1.25rem 1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={LABEL}>Username / Email *</label>
+                <input
+                  autoFocus type="text" placeholder="user@example.com"
+                  value={deliverForm.username}
+                  onChange={(e) => setDeliverForm((f) => ({ ...f, username: e.target.value }))}
+                  style={INP}
+                />
+              </div>
+              <div>
+                <label style={LABEL}>Password *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={deliverForm.showPass ? "text" : "password"} placeholder="••••••••"
+                    value={deliverForm.password}
+                    onChange={(e) => setDeliverForm((f) => ({ ...f, password: e.target.value }))}
+                    style={{ ...INP, paddingRight: "3rem" }}
+                  />
+                  <button type="button" onClick={() => setDeliverForm((f) => ({ ...f, showPass: !f.showPass }))}
+                    style={{ position: "absolute", right: "0.875rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#64748b", fontSize: "1rem", padding: 0 }}>
+                    {deliverForm.showPass ? "🙈" : "👁"}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label style={LABEL}>Expiry Date *</label>
+                <input type="date" value={deliverForm.expiryDate}
+                  onChange={(e) => setDeliverForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                  style={INP} />
+              </div>
+
+              {/* Optional toggles */}
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button type="button" onClick={() => setDeliverForm((f) => ({ ...f, showTotp: !f.showTotp }))}
+                  style={{ ...BTN(deliverForm.showTotp ? "green" : "ghost"), height: 30, fontSize: "0.6875rem" }}>
+                  {deliverForm.showTotp ? "− TOTP" : "+ TOTP Secret"}
+                </button>
+                <button type="button" onClick={() => setDeliverForm((f) => ({ ...f, showNotes: !f.showNotes }))}
+                  style={{ ...BTN(deliverForm.showNotes ? "green" : "ghost"), height: 30, fontSize: "0.6875rem" }}>
+                  {deliverForm.showNotes ? "− Notes" : "+ Notes"}
+                </button>
+              </div>
+              {deliverForm.showTotp && (
+                <div>
+                  <label style={LABEL}>TOTP Secret</label>
+                  <input type="text" placeholder="JBSWY3DPEHPK3PXP"
+                    value={deliverForm.totpSecret}
+                    onChange={(e) => setDeliverForm((f) => ({ ...f, totpSecret: e.target.value }))}
+                    style={{ ...INP, fontFamily: "monospace" }} />
+                </div>
+              )}
+              {deliverForm.showNotes && (
+                <div>
+                  <label style={LABEL}>Notes</label>
+                  <input type="text" placeholder="e.g. profile name, region..."
+                    value={deliverForm.notes}
+                    onChange={(e) => setDeliverForm((f) => ({ ...f, notes: e.target.value }))}
+                    style={INP} />
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: "1rem 1.5rem 1.25rem", borderTop: "1px solid #f1f5f9", display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+              <button onClick={() => setDeliverTarget(null)}
+                style={{ height: 42, padding: "0 1.25rem", borderRadius: "0.75rem", background: "#f8fafc", border: "1.5px solid #e2e8f0", color: "#475569", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                Cancel
+              </button>
+              <button disabled={quickDelivering} onClick={handleSingleDeliver}
+                style={{ height: 42, padding: "0 1.5rem", borderRadius: "0.75rem", background: quickDelivering ? "#94a3b8" : "linear-gradient(135deg,#00c853,#059669)", border: "none", color: "#fff", fontSize: "0.875rem", fontWeight: 800, cursor: quickDelivering ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 14px rgba(16,185,129,0.3)" }}>
+                {quickDelivering ? "Saving..." : "✓ Save & Deliver →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
