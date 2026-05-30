@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Chart, registerables } from "chart.js";
+import GuidesTab from "./GuidesTab";
 Chart.register(...registerables);
 
 /* ─────────────────────────────────────────
@@ -338,7 +339,7 @@ async function copyToClipboard(text: string) {
 /* ─────────────────────────────────────────
    ADMIN DASHBOARD
 ───────────────────────────────────────── */
-type TabType = "orders" | "products" | "analytics" | "credentials" | "reviews" | "support" | "staff" | "links" | "settings";
+type TabType = "orders" | "products" | "analytics" | "credentials" | "reviews" | "support" | "staff" | "links" | "settings" | "guides";
 
 /** Super User has full control; legacy "admin" role is treated as Super User. */
 function roleIsSuper(role: string): boolean {
@@ -936,6 +937,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
     ...(isSuper ? [{ key: "staff" as TabType, label: "Staff", icon: "👥" }] : []),
     { key: "links" as TabType, label: "Links", icon: "🔗" },
     ...(isSuper ? [{ key: "settings" as TabType, label: "Settings", icon: "⚙️" }] : []),
+    { key: "guides" as TabType, label: "Guides", icon: "📖" },
   ];
 
   /* ── Filtered products ── */
@@ -1032,23 +1034,21 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
         {/* Metric cards */}
         <div style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", padding: "1rem 1.5rem", display: "grid", gridTemplateColumns: `repeat(${isSuper ? 5 : 4}, minmax(0, 1fr))`, gap: "0.75rem" }} className="stats-grid">
           {[
-            ...(isSuper ? [{ icon: "💰", label: "Revenue", value: `৳${totalRevBdt.toLocaleString()}`, sub: `$${totalRevUsdt} USDT`, color: "#059669", bg: "#f0fdf4", border: "#bbf7d0", action: () => setTab("analytics") }] : []),
-            { icon: "🛒", label: "Orders", value: String(orders.length), sub: pendingCount > 0 ? `${pendingCount} pending` : "all up to date", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", action: () => { setTab("orders"); setFilterStatus("all"); } },
-            { icon: "📦", label: "Products", value: String(products.length), sub: lowStockProducts.length > 0 ? `${lowStockProducts.length} low stock` : "stock ok", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", action: () => setTab("products") },
-            { icon: "🔑", label: "Credentials", value: String(credentials.filter((c) => !c.isReclaimed).length), sub: urgentCreds > 0 ? `${urgentCreds} need attention` : "all active", color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", action: () => setTab("credentials") },
-            { icon: "📩", label: "Support", value: String(unresolvedCount), sub: unresolvedCount > 0 ? "awaiting reply" : "all resolved", color: unresolvedCount > 0 ? "#b91c1c" : "#15803d", bg: unresolvedCount > 0 ? "#fef2f2" : "#f0fdf4", border: unresolvedCount > 0 ? "#fecaca" : "#bbf7d0", action: () => setTab("support") },
+            ...(isSuper ? [{ icon: "💰", label: "Revenue", value: `৳${totalRevBdt.toLocaleString()}`, sub: `$${totalRevUsdt} USDT`, color: "#059669", bg: "#f0fdf4", border: "#bbf7d0" }] : []),
+            { icon: "🛒", label: "Orders", value: String(orders.length), sub: pendingCount > 0 ? `${pendingCount} pending` : "all up to date", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+            { icon: "📦", label: "Products", value: String(products.length), sub: lowStockProducts.length > 0 ? `${lowStockProducts.length} low stock` : "stock ok", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
+            { icon: "🔑", label: "Credentials", value: String(credentials.filter((c) => !c.isReclaimed).length), sub: urgentCreds > 0 ? `${urgentCreds} need attention` : "all active", color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc" },
+            { icon: "📩", label: "Support", value: String(unresolvedCount), sub: unresolvedCount > 0 ? "awaiting reply" : "all resolved", color: unresolvedCount > 0 ? "#b91c1c" : "#15803d", bg: unresolvedCount > 0 ? "#fef2f2" : "#f0fdf4", border: unresolvedCount > 0 ? "#fecaca" : "#bbf7d0" },
           ].map((s) => (
-            <button key={s.label} onClick={s.action}
-              style={{ display: "flex", flexDirection: "column", gap: "0.5rem", background: s.bg, border: `1.5px solid ${s.border}`, borderRadius: "1rem", padding: "0.875rem 1rem", cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "transform 0.12s, box-shadow 0.12s", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}>
+            <div key={s.label}
+              style={{ display: "flex", flexDirection: "column", gap: "0.5rem", background: s.bg, border: `1.5px solid ${s.border}`, borderRadius: "1rem", padding: "0.875rem 1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
               <span style={{ fontSize: "1.125rem", lineHeight: 1 }}>{s.icon}</span>
               <div>
                 <p style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0f172a", lineHeight: 1, margin: 0 }}>{s.value}</p>
                 <p style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0.2rem 0 0" }}>{s.label}</p>
                 <p style={{ fontSize: "0.6875rem", color: s.color, fontWeight: 600, margin: "0.15rem 0 0" }}>{s.sub}</p>
               </div>
-            </button>
+            </div>
           ))}
         </div>
 
@@ -1683,6 +1683,11 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
               {/* ══ SETTINGS TAB ══ */}
               {tab === "settings" && isSuper && (
                 <SettingsTab adminFetch={adminFetch} showToast={showToast} />
+              )}
+
+              {/* ══ GUIDES TAB ══ */}
+              {tab === "guides" && (
+                <GuidesTab setTab={(t: string) => setTab(t as TabType)} isSuper={isSuper} />
               )}
             </>
           )}
