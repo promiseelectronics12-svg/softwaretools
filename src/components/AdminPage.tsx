@@ -1647,7 +1647,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
 
               {/* ══ CUSTOMERS TAB ══ */}
               {tab === "customers" && (
-                <CustomersTab adminFetch={adminFetch} showToast={showToast} />
+                <CustomersTab adminFetch={adminFetch} showToast={showToast} onResetDevice={resetDeviceBinding} />
               )}
 
               {/* ══ LINKS TAB ══ */}
@@ -2068,9 +2068,10 @@ function custCredStatus(c: CustomerCred): { key: "reclaimed" | "expired" | "expi
   return { key: "active", label: `${days}d left`, color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" };
 }
 
-function CustomersTab({ adminFetch, showToast }: {
+function CustomersTab({ adminFetch, showToast, onResetDevice }: {
   adminFetch: (url: string, opts?: RequestInit) => Promise<Response>;
   showToast: (msg: string, type?: "success" | "error" | "warn") => void;
+  onResetDevice: (phone: string) => void;
 }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loaded, setLoaded]   = useState(false);
@@ -2187,10 +2188,14 @@ function CustomersTab({ adminFetch, showToast }: {
                     )}
 
                     {/* Footer actions */}
-                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", flexWrap: "wrap", alignItems: "center" }}>
                       <button disabled={reminding === -1 || !c.hasPush} onClick={() => sendReminder(c)}
                         style={{ ...BTN("green"), height: 34, opacity: !c.hasPush ? 0.5 : 1, cursor: !c.hasPush ? "not-allowed" : "pointer" }}>
                         {reminding === -1 ? "Sending…" : "🔔 Send Renewal Reminder"}
+                      </button>
+                      <button onClick={() => onResetDevice(c.phone)} title="Reset device fingerprint — lets customer re-verify on a new device"
+                        style={{ ...BTN("yellow"), height: 34 }}>
+                        📱 Reset Device Fingerprint
                       </button>
                       <span style={{ fontSize: "0.6875rem", color: "#94a3b8", fontWeight: 600, alignSelf: "center" }}>
                         Customer since {new Date(c.firstSeen).toLocaleDateString()}

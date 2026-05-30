@@ -373,7 +373,7 @@ export default function ProductDetail() {
           </div>
 
           {/* Interactive CTAs */}
-          <div style={{ display: "flex", gap: "0.75rem", paddingTop: "0.5rem" }}>
+          <div className="pd-cta" style={{ display: "flex", gap: "0.75rem", paddingTop: "0.5rem" }}>
             <button
               onClick={handleAdd}
               className={added ? "" : "btn btn-primary"}
@@ -515,6 +515,21 @@ export default function ProductDetail() {
         @media (min-width: 768px) and (max-width: 1024px) {
           .duration-grid {
             grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        /* Mobile: pin Add-to-Cart above the fixed bottom dock so it's never hidden */
+        @media (max-width: 767px) {
+          .pd-cta {
+            position: sticky;
+            bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+            z-index: 30;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 0.75rem;
+            border-radius: 1.25rem;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.05);
           }
         }
       `}} />
