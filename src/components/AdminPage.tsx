@@ -997,7 +997,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
       </aside>
 
       {/* ══ MAIN CONTENT ══ */}
-      <div className="admin-main" style={{ marginLeft: 220, flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <div className="admin-main" style={{ marginLeft: 220, flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
 
         {/* Top bar */}
         <header className="admin-topbar" style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(255, 255, 255, 0.7)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(16, 185, 129, 0.12)", padding: "0 clamp(0.75rem,3vw,1.5rem)", height: 52, display: "flex", alignItems: "center", gap: "0.75rem", boxShadow: "0 1px 4px rgba(16, 185, 129, 0.03)" }}>
@@ -1104,7 +1104,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                       <p style={{ fontSize: "0.8125rem", fontWeight: 500 }}>Try a different filter or search term</p>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minWidth: 0 }}>
                       {paginatedOrders.map((o) => {
                         const st         = STATUS_COLORS[o.status] || STATUS_COLORS.pending;
                         const isSelected = selectedOrders.has(o.id);
@@ -1114,9 +1114,9 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                         const canDeliver  = (o.status === "pending" || o.status === "verified" || o.status === "completed") && !isDelivered;
 
                         return (
-                          <div key={o.id} style={{ background: o.status === "pending" ? "linear-gradient(to right,#fffbeb 0%,#fff 60%)" : "#fff", border: `1px solid ${isSelected ? "#10b981" : "#e8edf3"}`, borderLeft: `4px solid ${STATUS_COLORS[o.status]?.dot || "#e2e8f0"}`, borderRadius: "1.125rem", overflow: "hidden", boxShadow: isExpanded ? "0 4px 16px rgba(0,0,0,0.07)" : "0 1px 3px rgba(0,0,0,0.04)", transition: "all 0.2s ease" }}>
+                          <div key={o.id} style={{ background: o.status === "pending" ? "linear-gradient(to right,#fffbeb 0%,#fff 60%)" : "#fff", border: `1px solid ${isSelected ? "#10b981" : "#e8edf3"}`, borderLeft: `4px solid ${STATUS_COLORS[o.status]?.dot || "#e2e8f0"}`, borderRadius: "1.125rem", overflow: "hidden", minWidth: 0, boxShadow: isExpanded ? "0 4px 16px rgba(0,0,0,0.07)" : "0 1px 3px rgba(0,0,0,0.04)", transition: "all 0.2s ease" }}>
                             {/* Compact row */}
-                            <div className="order-row" style={{ padding: "0.875rem 1.25rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "nowrap", cursor: "pointer" }} onClick={() => toggleExpandOrder(o.id)}>
+                            <div className="order-row" style={{ padding: "0.875rem 1.25rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "nowrap", minWidth: 0, cursor: "pointer" }} onClick={() => toggleExpandOrder(o.id)}>
                               <input type="checkbox" checked={isSelected} onChange={() => toggleSelectOrder(o.id)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16, flexShrink: 0 }} />
 
                               {/* Status dot */}
@@ -1126,7 +1126,7 @@ function AdminDashboard({ admin, onLogout }: { admin: SessionUser; onLogout: () 
                               <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "0.875rem", color: "#0f172a", flexShrink: 0, minWidth: 110 }}>{o.orderCode}</span>
 
                               {/* Items */}
-                              <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 {o.items.map((it) => `${it.nameEn} (${it.duration})`).join(", ")}
                               </span>
 
